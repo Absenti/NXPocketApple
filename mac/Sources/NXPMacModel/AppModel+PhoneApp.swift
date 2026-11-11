@@ -38,7 +38,7 @@ extension AppModel {
 
     public var appBuildBlockers: [String] {
         guard let repository else {
-            return ["This launcher does not run from the NXPocket repository (mac/.build/release/NXPocket), so it cannot build the app."]
+            return ["This launcher does not run from the iPorterNX repository (mac/.build/release/NXPocket), so it cannot build the app."]
         }
         return PhoneAppBuild.missing(in: repository, xcode: toolchain.xcode)
     }
@@ -57,11 +57,11 @@ extension AppModel {
 
     // MARK: - Building the IPA
 
-    /// Runs `tools/build_app.sh --device-unsigned`, which writes `NXPocket.ipa` into the output folder.
+    /// Runs `tools/build_app.sh --device-unsigned`, which writes `iPorterNX.ipa` into the output folder.
     public func buildPhoneApp() {
         guard !appBuild.isRunning else { return }
         guard let repository else {
-            appBuild = .failed(appBuildBlockers.first ?? "The NXPocket repository was not found.")
+            appBuild = .failed(appBuildBlockers.first ?? "The iPorterNX repository was not found.")
             return
         }
         let missing = PhoneAppBuild.missing(in: repository, xcode: toolchain.xcode)
@@ -118,7 +118,7 @@ extension AppModel {
         guard let ipa = phoneIPA else { return }
         let panel = NSSavePanel()
         panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-        panel.nameFieldStringValue = "NXPocket-\(ipa.version ?? "app")\(ipa.build.map { "-\($0)" } ?? "").ipa"
+        panel.nameFieldStringValue = "iPorterNX-\(ipa.version ?? "app")\(ipa.build.map { "-\($0)" } ?? "").ipa"
         panel.allowedContentTypes = []
         guard panel.runModal() == .OK, let destination = panel.url else { return }
         do {
@@ -175,7 +175,7 @@ extension AppModel {
                 self.cloudCopy = .failed("The copy to iCloud Drive failed: \(error.localizedDescription)")
                 return
             }
-            self.append("app: NXPocket.ipa copied to iCloud Drive → Downloads")
+            self.append("app: iPorterNX.ipa copied to iCloud Drive → Downloads")
             self.watchCloudCopy()
         }
     }
@@ -210,7 +210,7 @@ extension AppModel {
 
     // MARK: - Increased Memory Limit
 
-    /// Reads the bundle ID SideStore installed NXPocket under on the selected iPhone; the team is its suffix.
+    /// Reads the bundle ID SideStore installed iPorterNX under on the selected iPhone; the team is its suffix.
     public func findMemoryTarget() {
         guard let device = selectedDevice else {
             memoryTarget = .failure(NXPocketError(.deviceUnavailable, "Connect the iPhone: the App ID is read from it."))
@@ -224,7 +224,7 @@ extension AppModel {
                     let installed = try DeviceTransfer(toolchain: toolchain).installedBundleID(on: device, matching: base)
                     guard let target = MemoryLimitHelper.target(installed: installed, base: base) else {
                         return .failure(NXPocketError(.packageUnsupported,
-                                                      "NXPocket is installed as \(installed), with no team after it: it was not installed by SideStore."))
+                                                      "iPorterNX is installed as \(installed), with no team after it: it was not installed by SideStore."))
                     }
                     return .success(target)
                 } catch let error as NXPocketError {

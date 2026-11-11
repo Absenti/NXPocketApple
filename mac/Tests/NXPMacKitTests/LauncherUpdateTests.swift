@@ -47,12 +47,12 @@ final class LauncherUpdateTests: XCTestCase {
 
     private func releaseJSON(tag: String = "v0.3.0", draft: Bool = false, prerelease: Bool = false) -> Data {
         let object: [String: Any] = [
-            "tag_name": tag, "name": "NXPocket 0.3.0", "body": "- Saves are copied by themselves\n- Setup screen",
-            "html_url": "https://github.com/Absenti/NXPocket/releases/tag/\(tag)", "draft": draft, "prerelease": prerelease,
+            "tag_name": tag, "name": "iPorterNX 0.3.0", "body": "- Saves are copied by themselves\n- Setup screen",
+            "html_url": "https://github.com/Absenti/iPorterNX/releases/tag/\(tag)", "draft": draft, "prerelease": prerelease,
             "assets": [
-                ["name": "NXPocket-Launcher.zip", "browser_download_url": "https://github.com/Absenti/NXPocket/releases/download/\(tag)/NXPocket-Launcher.zip"],
-                ["name": "SHA256SUMS", "browser_download_url": "https://github.com/Absenti/NXPocket/releases/download/\(tag)/SHA256SUMS"],
-                ["name": "NXPocket.ipa", "browser_download_url": "http://example.com/NXPocket.ipa"],
+                ["name": "iPorterNX-Launcher.zip", "browser_download_url": "https://github.com/Absenti/iPorterNX/releases/download/\(tag)/iPorterNX-Launcher.zip"],
+                ["name": "SHA256SUMS", "browser_download_url": "https://github.com/Absenti/iPorterNX/releases/download/\(tag)/SHA256SUMS"],
+                ["name": "iPorterNX.ipa", "browser_download_url": "http://example.com/iPorterNX.ipa"],
                 ["name": "broken"],
             ],
         ]
@@ -63,10 +63,10 @@ final class LauncherUpdateTests: XCTestCase {
         let release = try LauncherUpdate.parse(releaseJSON())
         XCTAssertEqual(release.version, v("0.3.0"))
         XCTAssertEqual(release.tag, "v0.3.0")
-        XCTAssertEqual(release.title, "NXPocket 0.3.0")
+        XCTAssertEqual(release.title, "iPorterNX 0.3.0")
         XCTAssertTrue(release.notes.contains("Setup screen"))
-        XCTAssertEqual(release.page.absoluteString, "https://github.com/Absenti/NXPocket/releases/tag/v0.3.0")
-        XCTAssertEqual(Set(release.assets.keys), ["NXPocket-Launcher.zip", "SHA256SUMS"], "a plain-http asset is not taken")
+        XCTAssertEqual(release.page.absoluteString, "https://github.com/Absenti/iPorterNX/releases/tag/v0.3.0")
+        XCTAssertEqual(Set(release.assets.keys), ["iPorterNX-Launcher.zip", "SHA256SUMS"], "a plain-http asset is not taken")
     }
 
     func testAReleaseWhoseTagIsNotAVersionOrThatIsNotJSONIsRefused() {
@@ -111,15 +111,15 @@ final class LauncherUpdateTests: XCTestCase {
     func testShasumLinesAreReadInTextAndBinaryMode() {
         let zip = String(repeating: "a", count: 64), ipa = String(repeating: "B", count: 64)
         let text = """
-            \(zip)  NXPocket-Launcher.zip
-            \(ipa) *NXPocket.ipa
+            \(zip)  iPorterNX-Launcher.zip
+            \(ipa) *iPorterNX.ipa
             not a line
             1234  short.txt
 
             """
         let sums = LauncherUpdate.checksums(in: text)
-        XCTAssertEqual(sums["NXPocket-Launcher.zip"], zip)
-        XCTAssertEqual(sums["NXPocket.ipa"], ipa.lowercased())
+        XCTAssertEqual(sums["iPorterNX-Launcher.zip"], zip)
+        XCTAssertEqual(sums["iPorterNX.ipa"], ipa.lowercased())
         XCTAssertEqual(sums.count, 2)
     }
 
@@ -127,10 +127,10 @@ final class LauncherUpdateTests: XCTestCase {
 
     func testOnlyAWritableAppOutsideTheBuildFolderCanReplaceItself() throws {
         XCTAssertNotNil(LauncherUpdate.refusal(for: URL(fileURLWithPath: "/x/mac/.build/release/NXPocket")), "a plain executable")
-        XCTAssertNotNil(LauncherUpdate.refusal(for: URL(fileURLWithPath: "/x/mac/.build/NXPocket.app")), "the --app build")
-        XCTAssertNotNil(LauncherUpdate.refusal(for: URL(fileURLWithPath: "/private/var/folders/x/AppTranslocation/Y/d/NXPocket.app")))
+        XCTAssertNotNil(LauncherUpdate.refusal(for: URL(fileURLWithPath: "/x/mac/.build/iPorterNX.app")), "the --app build")
+        XCTAssertNotNil(LauncherUpdate.refusal(for: URL(fileURLWithPath: "/private/var/folders/x/AppTranslocation/Y/d/iPorterNX.app")))
 
-        let app = root.appendingPathComponent("Applications/NXPocket.app", isDirectory: true)
+        let app = root.appendingPathComponent("Applications/iPorterNX.app", isDirectory: true)
         try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
         XCTAssertNil(LauncherUpdate.refusal(for: app))
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: app.deletingLastPathComponent().path)
@@ -139,7 +139,7 @@ final class LauncherUpdateTests: XCTestCase {
     }
 
     /// An app bundle with a shell script for executable, ad hoc signed unless asked not to.
-    private func fakeApp(_ name: String = "NXPocket.app", bundleID: String = LauncherUpdate.bundleID, version: String = "0.3.0",
+    private func fakeApp(_ name: String = "iPorterNX.app", bundleID: String = LauncherUpdate.bundleID, version: String = "0.3.0",
                          signed: Bool = true) throws -> URL {
         let app = root.appendingPathComponent(UUID().uuidString).appendingPathComponent(name, isDirectory: true)
         try FileManager.default.createDirectory(at: app.appendingPathComponent("Contents/MacOS"), withIntermediateDirectories: true)
@@ -184,7 +184,7 @@ final class LauncherUpdateTests: XCTestCase {
     }
 
     /// The whole download path against a local server holding a real `--app` build zipped as a release is:
-    /// NXPOCKET_UPDATE_LIVE=http://127.0.0.1:<port> with NXPocket-Launcher.zip, SHA256SUMS and BAD_SUMS (wrong hash).
+    /// NXPOCKET_UPDATE_LIVE=http://127.0.0.1:<port> with iPorterNX-Launcher.zip, SHA256SUMS and BAD_SUMS (wrong hash).
     func testLivePrepareFromALocalServer() throws {
         guard let base = ProcessInfo.processInfo.environment["NXPOCKET_UPDATE_LIVE"].flatMap(URL.init(string:)) else {
             throw XCTSkip("set NXPOCKET_UPDATE_LIVE to a local server holding a release's files")
@@ -200,7 +200,7 @@ final class LauncherUpdateTests: XCTestCase {
         let newApp = try LauncherUpdate.prepare(release(sums: "SHA256SUMS"), current: v("0.1.0"), replacing: target) { written, expected in
             if expected > 0 { last.set(Double(written) / Double(expected)) }
         }
-        XCTAssertEqual(newApp.lastPathComponent, "NXPocket.app")
+        XCTAssertEqual(newApp.lastPathComponent, "iPorterNX.app")
         XCTAssertEqual(newApp.deletingLastPathComponent().lastPathComponent, "unpacked")
         XCTAssertEqual(last.value, 1)
         print("live update: unpacked \(newApp.path)")
@@ -215,16 +215,16 @@ final class LauncherUpdateTests: XCTestCase {
     // MARK: - The swap script
 
     private func runSwap(newAppPresent: Bool) throws -> (old: URL, trashed: URL, staging: URL) {
-        let old = root.appendingPathComponent("Apps/NXPocket's.app", isDirectory: true)   // a quote in the path
+        let old = root.appendingPathComponent("Apps/iPorterNX's.app", isDirectory: true)   // a quote in the path
         try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
         try Data("old".utf8).write(to: old.appendingPathComponent("which"))
         let staging = root.appendingPathComponent("staging", isDirectory: true)
-        let newApp = staging.appendingPathComponent("unpacked/NXPocket.app", isDirectory: true)
+        let newApp = staging.appendingPathComponent("unpacked/iPorterNX.app", isDirectory: true)
         if newAppPresent {
             try FileManager.default.createDirectory(at: newApp, withIntermediateDirectories: true)
             try Data("new".utf8).write(to: newApp.appendingPathComponent("which"))
         }
-        let trashed = root.appendingPathComponent("Trash/NXPocket 0.2.0 1.app", isDirectory: true)
+        let trashed = root.appendingPathComponent("Trash/iPorterNX 0.2.0 1.app", isDirectory: true)
         try FileManager.default.createDirectory(at: trashed.deletingLastPathComponent(), withIntermediateDirectories: true)
         // A process that has already exited stands for the launcher.
         let gone = Process()

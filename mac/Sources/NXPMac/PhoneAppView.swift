@@ -7,7 +7,7 @@ import NXPMacModel
 /// SideStore's labels below were read in its source at the commit installed on the test iPhone (0.7.0 nightly,
 /// 6032424a, 2026-09-11): the "My Apps" and "Settings" tabs, the "+" button of My Apps (a document picker), "Refresh
 /// All", "ADVANCED SETTINGS" → "Certificate Management", the certificate's menu "Export Certificate" → "Export Full
-/// (.p12)", then "Export". NXPocket's own are from app/Sources/NXShellUI/ShellStrings.swift.
+/// (.p12)", then "Export". iPorterNX's own are from app/Sources/NXShellUI/ShellStrings.swift.
 struct PhoneAppView: View {
     @EnvironmentObject private var model: AppModel
     @State private var confirmingMemory = false
@@ -36,7 +36,7 @@ struct PhoneAppView: View {
     private var ipaCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeading(text: "NXPocket.ipa")
+                SectionHeading(text: "iPorterNX.ipa")
                 if let ipa = model.phoneIPA {
                     HStack(spacing: 8) {
                         Pill(text: ipa.versionText)
@@ -84,7 +84,7 @@ struct PhoneAppView: View {
             }
         case .inCloud(let date):
             if date < ipa.date.addingTimeInterval(-1) {
-                Text("iCloud Drive → Downloads has an older NXPocket.ipa: copy this one again.").font(.system(size: 11)).foregroundStyle(Ink.accent)
+                Text("iCloud Drive → Downloads has an older iPorterNX.ipa: copy this one again.").font(.system(size: 11)).foregroundStyle(Ink.accent)
             } else {
                 Text("In iCloud Drive → Downloads: ready for SideStore on the iPhone.").font(.system(size: 11)).foregroundStyle(Ink.good)
             }
@@ -131,13 +131,13 @@ struct PhoneAppView: View {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeading(text: "Install it with SideStore")
                 step(1, "Copy to iCloud Drive, and wait until it says the IPA is in iCloud.")
-                step(2, "In SideStore, open My Apps, tap + at the top, and in the file picker open iCloud Drive → Downloads → NXPocket.ipa.")
-                warning("Never tap NXPocket.ipa in the Files app itself: that installs a second NXPocket beside the real one, which cannot run games. Always go through SideStore's +.")
-                step(3, "An update goes the same way, over the installed app: its games and saves stay (checked on the iPhone on 11/11). Never delete NXPocket first: deleting an app deletes its data with it, every game sent to it (gigabytes to send again) and every save.")
-                step(4, "Open NXPocket once. It makes its folders, and this Mac can then send it games.")
+                step(2, "In SideStore, open My Apps, tap + at the top, and in the file picker open iCloud Drive → Downloads → iPorterNX.ipa.")
+                warning("Never tap iPorterNX.ipa in the Files app itself: that installs a second iPorterNX beside the real one, which cannot run games. Always go through SideStore's +.")
+                step(3, "An update goes the same way, over the installed app: its games and saves stay (checked on the iPhone on 11/11). Never delete iPorterNX first: deleting an app deletes its data with it, every game sent to it (gigabytes to send again) and every save.")
+                step(4, "Open iPorterNX once. It makes its folders, and this Mac can then send it games.")
                 step(5, "Export the certificate: SideStore → Settings → ADVANCED SETTINGS → Certificate Management, touch and hold the active certificate, Export Certificate → Export Full (.p12), set a password, Export, and save the file to Files.")
-                step(6, "In NXPocket: Settings → Certificate → Import a .p12 (Réglages → Certificat → Importer un .p12), then type the password. NXPocket signs each game with it.")
-                step(7, "A free Apple ID signs apps for 7 days. Before they run out, open SideStore → My Apps → Refresh All. If NXPocket then says SideStore signs it with another certificate, export and import the .p12 again.")
+                step(6, "In iPorterNX: Settings → Certificate → Import a .p12 (Réglages → Certificat → Importer un .p12), then type the password. iPorterNX signs each game with it.")
+                step(7, "A free Apple ID signs apps for 7 days. Before they run out, open SideStore → My Apps → Refresh All. If iPorterNX then says SideStore signs it with another certificate, export and import the .p12 again.")
             }
         }
     }
@@ -165,7 +165,7 @@ struct PhoneAppView: View {
                 Text("""
                 Games need more memory than an app gets by default. iOS gives more to an app whose App ID has \
                 "Increased Memory Limit". A free Apple ID cannot turn it on in a web page, but Xcode does it when it \
-                signs an app with that entitlement. This builds a one-off helper app with NXPocket's App ID, signed by \
+                signs an app with that entitlement. This builds a one-off helper app with iPorterNX's App ID, signed by \
                 Xcode with your team: nothing is installed, and only the App ID changes at Apple.
                 """)
                 .font(.system(size: 12)).foregroundStyle(Ink.secondary).fixedSize(horizontal: false, vertical: true)
@@ -181,7 +181,7 @@ struct PhoneAppView: View {
             }
         } message: {
             if case .success(let target) = model.memoryTarget {
-                Text("Xcode signs a helper app as \(target.bundleID) with team \(target.team) and is allowed to update its provisioning at Apple (-allowProvisioningUpdates). That adds the capability to the App ID SideStore registered for NXPocket. If Xcode has no development certificate for this Apple ID on this Mac yet, it makes one. Nothing is installed on the iPhone.")
+                Text("Xcode signs a helper app as \(target.bundleID) with team \(target.team) and is allowed to update its provisioning at Apple (-allowProvisioningUpdates). That adds the capability to the App ID SideStore registered for iPorterNX. If Xcode has no development certificate for this Apple ID on this Mac yet, it makes one. Nothing is installed on the iPhone.")
             }
         }
     }
@@ -190,7 +190,7 @@ struct PhoneAppView: View {
     private var targetRow: some View {
         switch model.memoryTarget {
         case .none:
-            HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Reading NXPocket's App ID from the iPhone…").font(.system(size: 11)).foregroundStyle(Ink.secondary) }
+            HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Reading iPorterNX's App ID from the iPhone…").font(.system(size: 11)).foregroundStyle(Ink.secondary) }
         case .failure(let error):
             HStack(spacing: 8) {
                 Text(error.detail).font(.system(size: 11)).foregroundStyle(Ink.bad)
@@ -232,8 +232,8 @@ struct PhoneAppView: View {
         case .finished(let message):
             VStack(alignment: .leading, spacing: 6) {
                 Text(message).font(.system(size: 12, weight: .medium)).foregroundStyle(Ink.good)
-                step(1, "In SideStore → My Apps, tap Refresh All, or install the IPA again over NXPocket: the new signature carries the entitlement.")
-                step(2, "In NXPocket → Settings → Memory (Réglages → Mémoire), check that it says \"Increased memory limit is active\" (\"La limite de mémoire augmentée est active\").")
+                step(1, "In SideStore → My Apps, tap Refresh All, or install the IPA again over iPorterNX: the new signature carries the entitlement.")
+                step(2, "In iPorterNX → Settings → Memory (Réglages → Mémoire), check that it says \"Increased memory limit is active\" (\"La limite de mémoire augmentée est active\").")
             }
         case .failed(let message):
             Text(message).font(.system(size: 11)).foregroundStyle(Ink.bad).textSelection(.enabled)

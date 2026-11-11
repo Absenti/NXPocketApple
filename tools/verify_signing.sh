@@ -34,9 +34,9 @@ say "1. a certificate chain and a provisioning profile naming team $TEAM"
 # intermediate whose name hash matches the leaf's issuer. A real developer export carries the WWDR intermediate for
 # exactly this reason, so the test carries a CA of its own.
 openssl req -x509 -newkey rsa:2048 -keyout "$OUT/ca-key.pem" -out "$OUT/ca.pem" -days 30 -nodes \
-    -subj "/CN=NXPocket test CA/O=NXPocket test/C=FR" 2>/dev/null || die "openssl could not make the CA"
+    -subj "/CN=iPorterNX test CA/O=iPorterNX test/C=FR" 2>/dev/null || die "openssl could not make the CA"
 openssl req -newkey rsa:2048 -keyout "$OUT/key.pem" -out "$OUT/leaf.csr" -nodes \
-    -subj "/CN=Apple Development: NXPocket test ($TEAM)/OU=$TEAM/O=NXPocket test/C=FR" 2>/dev/null \
+    -subj "/CN=Apple Development: iPorterNX test ($TEAM)/OU=$TEAM/O=iPorterNX test/C=FR" 2>/dev/null \
     || die "openssl could not make the key"
 # The code-signing extended key usage is what Apple's verifier checks before it will look at anything else. Without
 # it codesign stops at "Invalid Key Usage for policy" and the real verdict stays hidden.
@@ -48,7 +48,7 @@ EOF
 openssl x509 -req -in "$OUT/leaf.csr" -CA "$OUT/ca.pem" -CAkey "$OUT/ca-key.pem" -CAcreateserial \
     -extfile "$OUT/leaf.ext" -out "$OUT/cert.pem" -days 30 2>/dev/null || die "the CA could not issue the leaf"
 openssl pkcs12 -export -inkey "$OUT/key.pem" -in "$OUT/cert.pem" -certfile "$OUT/ca.pem" -out "$OUT/cert.p12" \
-    -passout "pass:$PASSPHRASE" -name "NXPocket test" 2>/dev/null || die "openssl could not make a p12"
+    -passout "pass:$PASSPHRASE" -name "iPorterNX test" 2>/dev/null || die "openssl could not make a p12"
 echo "  issuer:  $(openssl x509 -in "$OUT/cert.pem" -noout -issuer | sed 's/issuer=//')"
 echo "  subject: $(openssl x509 -in "$OUT/cert.pem" -noout -subject | sed 's/subject=//')"
 
@@ -56,7 +56,7 @@ cat > "$OUT/profile.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Name</key><string>NXPocket test profile</string>
+  <key>Name</key><string>iPorterNX test profile</string>
   <key>TeamIdentifier</key><array><string>$TEAM</string></array>
   <key>UUID</key><string>00000000-0000-0000-0000-0000000000FF</string>
   <key>ExpirationDate</key><date>2030-01-01T00:00:00Z</date>

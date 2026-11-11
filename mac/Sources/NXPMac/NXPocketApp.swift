@@ -6,7 +6,7 @@ struct NXPocketApp: App {
     @StateObject private var model = AppModel()
 
     var body: some Scene {
-        WindowGroup("NXPocket") {
+        WindowGroup("iPorterNX") {
             RootView()
                 .environmentObject(model)
                 .frame(minWidth: 980, minHeight: 640)

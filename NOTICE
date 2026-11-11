@@ -1,8 +1,8 @@
-NXPocket notice
+iPorterNX notice
 
 This file records where the project comes from and what it depends on. The licence text is in LICENSE.
 
-NXPocket is an independent shell: it holds a library of games, imports packages a Mac app built, signs them on the
+iPorterNX is an independent shell: it holds a library of games, imports packages a Mac app built, signs them on the
 device, and starts one. The engine that runs a game is not part of this repository.
 
 The engine
@@ -16,7 +16,7 @@ The engine
   revision NX2Apple pins, then links it as engine/. The Mac launcher drives that tree. The iPhone app links none of it:
   each game's framework carries its own engine host (docs/ENGINE.md).
 
-  What NXPocket reuses from them, and where:
+  What iPorterNX reuses from them, and where:
 
   - The RomFS image identity (FNV-1a 64 over the header and the index, `romfs_id_of_image` in
     dm/host/romfs_identity.h). Reimplemented in core/Sources/NXPocketKit/Package/RomfsIdentity.swift, with tests.

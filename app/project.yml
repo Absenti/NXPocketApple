@@ -48,8 +48,8 @@ targets:
     info:
       path: Gen/Info.plist
       properties:
-        CFBundleDisplayName: NXPocket
-        CFBundleName: NXPocket
+        CFBundleDisplayName: iPorterNX
+        CFBundleName: iPorterNX
         # Placeholders: the "Version" script after the build writes ../VERSION and $BUILD_NUMBER over them.
         CFBundleShortVersionString: '0.0.0'
         CFBundleVersion: '1'
@@ -104,9 +104,9 @@ targets:
           plist="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build" "$plist"
-          echo "NXPocket $version ($build)"
+          echo "iPorterNX $version ($build)"
     entitlements:
-      path: Gen/NXPocket.entitlements
+      path: Gen/iPorterNX.entitlements
       properties:
         # A game's framework inherits this app's entitlements: this is what raises the ceiling to several GB.
         com.apple.developer.kernel.increased-memory-limit: true

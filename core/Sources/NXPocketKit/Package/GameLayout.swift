@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where NXPocket keeps things. Both apps read these names, so they live in one place.
+/// Where iPorterNX keeps things. Both apps read these names, so they live in one place.
 public enum GameLayout {
     public static let gamesFolder = "games"
     public static let incomingFolder = ".incoming"

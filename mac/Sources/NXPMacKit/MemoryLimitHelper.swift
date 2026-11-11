@@ -1,16 +1,16 @@
 import Foundation
 import NXPocketKit
 
-/// Turns on "Increased Memory Limit" for the App ID SideStore registered for NXPocket, the way it was done by hand on
+/// Turns on "Increased Memory Limit" for the App ID SideStore registered for iPorterNX, the way it was done by hand on
 /// 2026-11-10 (GetMoreRam did not work for this user): a one-off app whose bundle ID is exactly that App ID, with
 /// the entitlement, built once for a device with Xcode's automatic signing. Xcode then turns the capability on for
-/// the App ID on Apple's side; nothing it builds is installed. SideStore's next install or refresh of NXPocket
+/// the App ID on Apple's side; nothing it builds is installed. SideStore's next install or refresh of iPorterNX
 /// carries the entitlement, since it signs with what the App ID allows.
 public enum MemoryLimitHelper {
     public static let entitlement = "com.apple.developer.kernel.increased-memory-limit"
     public static let scheme = "EnableMemoryLimit"
 
-    /// The App ID and the team, read from the bundle ID SideStore installed NXPocket under: SideStore appends the
+    /// The App ID and the team, read from the bundle ID SideStore installed iPorterNX under: SideStore appends the
     /// team to it (`dev.nxpocket.app.ABCDE12345`).
     public struct Target: Equatable, Sendable {
         public var bundleID: String
@@ -46,8 +46,8 @@ public enum MemoryLimitHelper {
 
     public static func projectYAML(_ target: Target) -> String {
         """
-        # One-off helper made by the NXPocket launcher: asks Apple, through Xcode's automatic signing, to enable
-        # "Increased Memory Limit" on the App ID SideStore registered for NXPocket. Nothing it builds is installed.
+        # One-off helper made by the iPorterNX launcher: asks Apple, through Xcode's automatic signing, to enable
+        # "Increased Memory Limit" on the App ID SideStore registered for iPorterNX. Nothing it builds is installed.
         name: \(scheme)
         options:
           deploymentTarget:

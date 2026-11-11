@@ -1,9 +1,9 @@
-# How NXPocket is put together
+# How iPorterNX is put together
 
 ```
 core/            NXPocketKit — the format and the checks, shared by both apps
-mac/             NXPocket — the macOS launcher (SwiftPM executable, SwiftUI)
-app/             NXShell (NXShellUI, NXShellHost) + the XcodeGen project that builds NXPocket.app
+mac/             iPorterNX — the macOS launcher (SwiftPM executable, SwiftUI)
+app/             NXShell (NXShellUI, NXShellHost) + the XcodeGen project that builds iPorterNX.app
 tools/           bootstrap, patches, builds
 patches/         our changes to the engine, one file each, listed in patches/series
 probe/           the app that decided the architecture (docs/SIGNING.md)
@@ -32,7 +32,7 @@ Pure Foundation, no UI, no platform assumptions. Both apps link it, so the two s
 
 ## `mac/` — the launcher
 
-`NXPMacKit` (no SwiftUI) then `NXPMacModel` (the stores) then the `NXPocket` executable (the views). Each layer may
+`NXPMacKit` (no SwiftUI) then `NXPMacModel` (the stores) then the `iPorterNX` executable (the views). Each layer may
 only use the one above it.
 
 - `Toolchain` — finds Xcode, a Python new enough for the engine, and the engine tree.

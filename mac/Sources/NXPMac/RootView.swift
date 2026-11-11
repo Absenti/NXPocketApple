@@ -27,7 +27,7 @@ struct RootView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("NXPocket").font(.system(size: 17, weight: .semibold)).foregroundStyle(Ink.primary)
+                Text("iPorterNX").font(.system(size: 17, weight: .semibold)).foregroundStyle(Ink.primary)
                 Text("Switch games on your iPhone").font(.system(size: 11)).foregroundStyle(Ink.secondary)
             }
             .padding(.horizontal, 16)

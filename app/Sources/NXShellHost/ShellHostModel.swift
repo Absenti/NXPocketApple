@@ -60,7 +60,7 @@ public final class ShellHostModel: ObservableObject {
     @Published public private(set) var touch: TouchControls
 
     public let engineHost: EngineHost
-    /// Whether a newer NXPocket exists (`UpdateChannel`, the app's only network call).
+    /// Whether a newer iPorterNX exists (`UpdateChannel`, the app's only network call).
     public let updates: UpdateChecker
 
     let importer: ImportService

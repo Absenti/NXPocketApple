@@ -63,7 +63,7 @@ final class ErrorReportTests: XCTestCase {
         let report = model.report(error: "dlopen refused DmGame", titleID: LibraryFixture.titleID)
         XCTAssertTrue(report.contains("error: dlopen refused DmGame"))
         XCTAssertTrue(report.contains("game: Fixture (\(LibraryFixture.titleID))"))
-        XCTAssertTrue(report.contains("app: NXPocket "))
+        XCTAssertTrue(report.contains("app: iPorterNX "))
         XCTAssertTrue(report.contains("iOS \(UIDevice.current.systemVersion), "))
         XCTAssertTrue(report.contains("certificate: none"))
         XCTAssertTrue(report.contains("bundle ID: "))

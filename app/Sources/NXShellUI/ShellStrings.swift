@@ -49,9 +49,9 @@ public enum ShellStrings {
         language.hasPrefix("fr") ? "La version \(version) est disponible" : "Version \(version) is available"
     }
 
-    /// "NXPocket is up to date (0.2.0)".
+    /// "iPorterNX is up to date (0.2.0)".
     public static func upToDate(_ version: String, language: String = Locale.preferredLanguages.first ?? "en") -> String {
-        language.hasPrefix("fr") ? "NXPocket est à jour (\(version))" : "NXPocket is up to date (\(version))"
+        language.hasPrefix("fr") ? "iPorterNX est à jour (\(version))" : "iPorterNX is up to date (\(version))"
     }
 
     /// The question asked when a game's icon is touched while another game runs: the engine starts once per process,
@@ -82,7 +82,7 @@ public enum ShellStrings {
     static let english: [Key: String] = [
         .library: "Library",
         .libraryEmptyTitle: "No games yet",
-        .libraryEmptyBody: "Build a game on your Mac with NXPocket and send it over the cable or Wi-Fi. It shows up here on its own, without reinstalling this app.",
+        .libraryEmptyBody: "Build a game on your Mac with iPorterNX and send it over the cable or Wi-Fi. It shows up here on its own, without reinstalling this app.",
         .settings: "Settings",
         .certificate: "Certificate",
         .memory: "Memory",
@@ -183,7 +183,7 @@ public enum ShellStrings {
         .signAgainBody: "The certificate changed or is about to run out. Signing takes a moment per game.",
         .sign: "Sign",
         .rename: "Rename",
-        .renameBody: "Only the name shown in NXPocket changes. The game's files stay as they are, and an update keeps the name.",
+        .renameBody: "Only the name shown in iPorterNX changes. The game's files stay as they are, and an update keeps the name.",
         .originalName: "Original name",
         .resignGame: "Sign again",
         .copyIdentifier: "Copy the identifier",
@@ -201,7 +201,7 @@ public enum ShellStrings {
         .deleteSavesBody: "They cannot be brought back, unless you have a copy on the Mac or in Files.",
         .noSavesYet: "No save yet",
         .savesImported: "Save imported",
-        .previousSavesKept: "The saves it replaced are kept in Files › On My iPhone › NXPocket › Saves.",
+        .previousSavesKept: "The saves it replaced are kept in Files › On My iPhone › iPorterNX › Saves.",
         .savesNotImported: "Save not imported",
         .saveOfOtherGame: "This save belongs to another game:",
         .notASaveCopy: "Pick a save copy: a folder the Mac app copied (it holds backup.json) or a .zip exported here.",
@@ -222,7 +222,7 @@ public enum ShellStrings {
         .shortcutStep2: "Open Settings › Profile Downloaded › Install, then enter the iPhone's passcode.",
         .shortcutStep3: "The game's icon appears on the Home Screen. Touching it opens the game.",
         .shortcutRemove: "To remove it: Settings › General › VPN & Device Management.",
-        .shortcutDescription: "Puts this game's icon on the Home Screen. Touching it opens the game in NXPocket.",
+        .shortcutDescription: "Puts this game's icon on the Home Screen. Touching it opens the game in iPorterNX.",
         .openInFiles: "Open in Files",
         .shareFile: "Share the file",
         .shortcutFailed: "The shortcut could not be made",
@@ -246,8 +246,8 @@ public enum ShellStrings {
         .engineInEachGame: "in each game's framework",
         .noEngineInBuild: "none in this build",
         .folderLabel: "Folder",
-        .folderInFiles: "Files › On My iPhone › NXPocket",
-        .noKeysNotice: "NXPocket ships no key, no firmware and no game. The games it runs come from your own dumps, built on your own Mac.",
+        .folderInFiles: "Files › On My iPhone › iPorterNX",
+        .noKeysNotice: "iPorterNX ships no key, no firmware and no game. The games it runs come from your own dumps, built on your own Mac.",
         .p12PasswordHint: "The password you set when SideStore exported the .p12.",
         .identifierLabel: "Identifier",
         .keychainRefused: "The keychain refused the certificate",
@@ -261,7 +261,7 @@ public enum ShellStrings {
         .updates: "Updates",
         .installedVersion: "Installed version",
         .appIdentifierLabel: "App identifier",
-        .addToSideStore: "Add NXPocket to SideStore",
+        .addToSideStore: "Add iPorterNX to SideStore",
         .sideStoreDidNotOpen: "SideStore did not open. Add this source in SideStore, Sources tab:",
         .copyAddress: "Copy the address",
         .checkUpdates: "Check",
@@ -272,7 +272,7 @@ public enum ShellStrings {
         .checkDaily: "Check once a day",
         .lastCheck: "Last check",
         .later: "Later",
-        .updateWarning: "Update NXPocket through SideStore only, never by touching an IPA in Files. SideStore must keep the app identifier above: under another identifier the app starts from nothing, and the games and saves of the previous install are gone.",
+        .updateWarning: "Update iPorterNX through SideStore only, never by touching an IPA in Files. SideStore must keep the app identifier above: under another identifier the app starts from nothing, and the games and saves of the previous install are gone.",
         .updateSavesHint: "The Mac app copies the games' saves every day and before each send. Make a copy from the Mac before an update.",
         .updateThroughSideStore: "Install it from SideStore, which keeps the games and saves.",
         .networkNotice: "The app's only connection: the update check reads source.json on GitHub, one request, no personal data."
@@ -281,7 +281,7 @@ public enum ShellStrings {
     static let french: [Key: String] = [
         .library: "Bibliothèque",
         .libraryEmptyTitle: "Aucun jeu",
-        .libraryEmptyBody: "Construis un jeu sur ton Mac avec NXPocket et envoie-le par câble ou en Wi-Fi. Il apparaît ici tout seul, sans réinstaller cette app.",
+        .libraryEmptyBody: "Construis un jeu sur ton Mac avec iPorterNX et envoie-le par câble ou en Wi-Fi. Il apparaît ici tout seul, sans réinstaller cette app.",
         .settings: "Réglages",
         .certificate: "Certificat",
         .memory: "Mémoire",
@@ -382,7 +382,7 @@ public enum ShellStrings {
         .signAgainBody: "Le certificat a changé ou va expirer. La signature prend un moment par jeu.",
         .sign: "Signer",
         .rename: "Renommer",
-        .renameBody: "Seul le nom affiché dans NXPocket change. Les fichiers du jeu restent tels quels et une mise à jour garde ce nom.",
+        .renameBody: "Seul le nom affiché dans iPorterNX change. Les fichiers du jeu restent tels quels et une mise à jour garde ce nom.",
         .originalName: "Nom d'origine",
         .resignGame: "Re-signer",
         .copyIdentifier: "Copier l'identifiant",
@@ -400,7 +400,7 @@ public enum ShellStrings {
         .deleteSavesBody: "Elles ne pourront pas revenir, sauf si tu en as une copie sur le Mac ou dans Fichiers.",
         .noSavesYet: "Pas encore de sauvegarde",
         .savesImported: "Sauvegarde importée",
-        .previousSavesKept: "Les sauvegardes remplacées sont gardées dans Fichiers › Sur mon iPhone › NXPocket › Saves.",
+        .previousSavesKept: "Les sauvegardes remplacées sont gardées dans Fichiers › Sur mon iPhone › iPorterNX › Saves.",
         .savesNotImported: "Sauvegarde non importée",
         .saveOfOtherGame: "Cette sauvegarde est celle d'un autre jeu :",
         .notASaveCopy: "Choisis une copie de sauvegarde : un dossier copié par l'app Mac (il contient backup.json) ou un .zip exporté ici.",
@@ -421,7 +421,7 @@ public enum ShellStrings {
         .shortcutStep2: "Ouvre Réglages › Profil téléchargé › Installer, puis saisis le code de l'iPhone.",
         .shortcutStep3: "L'icône du jeu apparaît sur l'écran d'accueil. La toucher ouvre le jeu.",
         .shortcutRemove: "Pour la retirer : Réglages › Général › VPN et gestion de l'appareil.",
-        .shortcutDescription: "Met l'icône de ce jeu sur l'écran d'accueil. La toucher ouvre le jeu dans NXPocket.",
+        .shortcutDescription: "Met l'icône de ce jeu sur l'écran d'accueil. La toucher ouvre le jeu dans iPorterNX.",
         .openInFiles: "Ouvrir dans Fichiers",
         .shareFile: "Partager le fichier",
         .shortcutFailed: "Le raccourci n'a pas pu être créé",
@@ -445,8 +445,8 @@ public enum ShellStrings {
         .engineInEachGame: "dans le framework de chaque jeu",
         .noEngineInBuild: "aucun dans cette version",
         .folderLabel: "Dossier",
-        .folderInFiles: "Fichiers › Sur mon iPhone › NXPocket",
-        .noKeysNotice: "NXPocket ne fournit aucune clé, aucun firmware et aucun jeu. Les jeux qu'il lance viennent de tes propres copies, construites sur ton Mac.",
+        .folderInFiles: "Fichiers › Sur mon iPhone › iPorterNX",
+        .noKeysNotice: "iPorterNX ne fournit aucune clé, aucun firmware et aucun jeu. Les jeux qu'il lance viennent de tes propres copies, construites sur ton Mac.",
         .p12PasswordHint: "Le mot de passe choisi quand SideStore a exporté le .p12.",
         .identifierLabel: "Identifiant",
         .keychainRefused: "Le trousseau a refusé le certificat",
@@ -460,7 +460,7 @@ public enum ShellStrings {
         .updates: "Mises à jour",
         .installedVersion: "Version installée",
         .appIdentifierLabel: "Identifiant de l'app",
-        .addToSideStore: "Ajouter NXPocket à SideStore",
+        .addToSideStore: "Ajouter iPorterNX à SideStore",
         .sideStoreDidNotOpen: "SideStore ne s'est pas ouvert. Ajoute cette source dans SideStore, onglet Sources :",
         .copyAddress: "Copier l'adresse",
         .checkUpdates: "Vérifier",
@@ -471,7 +471,7 @@ public enum ShellStrings {
         .checkDaily: "Vérifier une fois par jour",
         .lastCheck: "Dernière vérification",
         .later: "Plus tard",
-        .updateWarning: "Mets NXPocket à jour par SideStore seulement, jamais en touchant un IPA dans Fichiers. SideStore doit garder l'identifiant de l'app ci-dessus : sous un autre identifiant, l'app repart de zéro et les jeux et sauvegardes de l'installation précédente ne sont plus là.",
+        .updateWarning: "Mets iPorterNX à jour par SideStore seulement, jamais en touchant un IPA dans Fichiers. SideStore doit garder l'identifiant de l'app ci-dessus : sous un autre identifiant, l'app repart de zéro et les jeux et sauvegardes de l'installation précédente ne sont plus là.",
         .updateSavesHint: "L'app Mac copie les sauvegardes des jeux chaque jour et avant chaque envoi. Fais-en une copie depuis le Mac avant une mise à jour.",
         .updateThroughSideStore: "Installe-la depuis SideStore, qui garde les jeux et les sauvegardes.",
         .networkNotice: "Seule connexion de l'app : la vérification des mises à jour lit source.json sur GitHub, en une requête, sans aucune donnée personnelle."

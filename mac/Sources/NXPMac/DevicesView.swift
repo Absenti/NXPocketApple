@@ -119,7 +119,7 @@ struct DevicesView: View {
                     if let problem = model.phoneProblem {
                         Text(problem).font(.system(size: 11)).foregroundStyle(Ink.bad).textSelection(.enabled)
                     } else if model.phoneGames.isEmpty && model.phoneCheckedAt != nil {
-                        Text("No game installed yet. A game sent shows here once NXPocket on the iPhone has imported it.")
+                        Text("No game installed yet. A game sent shows here once iPorterNX on the iPhone has imported it.")
                             .font(.system(size: 11)).foregroundStyle(Ink.secondary)
                     }
                     ForEach(model.phoneGames, id: \.titleID) { game in
@@ -202,10 +202,10 @@ struct DevicesView: View {
             VStack(alignment: .leading, spacing: 8) {
                 SectionHeading(text: "How a game reaches the phone")
                 Text("""
-                NXPocket copies the package into the app's Documents/.incoming folder, over the cable or Wi-Fi, and writes a \
-                .complete marker last. NXPocket on the iPhone imports only a transfer that carries that marker, \
+                iPorterNX copies the package into the app's Documents/.incoming folder, over the cable or Wi-Fi, and writes a \
+                .complete marker last. iPorterNX on the iPhone imports only a transfer that carries that marker, \
                 verifies every file, signs the framework with your certificate, and moves it into the library. \
-                No reinstall is needed for a new game. A copy that fails or is cancelled is marked, and NXPocket on \
+                No reinstall is needed for a new game. A copy that fails or is cancelled is marked, and iPorterNX on \
                 the iPhone deletes it when it next opens; one cut off (cable pulled, this app quit) after ten minutes \
                 without activity.
                 """)
@@ -283,7 +283,7 @@ struct SettingsView: View {
 
                 Card {
                     VStack(alignment: .leading, spacing: 10) {
-                        SectionHeading(text: "What NXPocket never does")
+                        SectionHeading(text: "What iPorterNX never does")
                         ForEach(["Ask for your Apple ID password.",
                                  "Copy prod.keys into a package, a log or a repository.",
                                  "Send anything to a server: the engine runs on this Mac."], id: \.self) { line in

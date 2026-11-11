@@ -90,7 +90,7 @@ extension ShellHostModel {
     public func makeShortcut(_ game: InstalledGame) -> Result<URL, NXPocketError> {
         let name = name(of: game)
         let texts = ShortcutProfile.Texts(label: name,
-                                          displayName: language.hasPrefix("fr") ? "NXPocket : \(name)" : "NXPocket: \(name)",
+                                          displayName: language.hasPrefix("fr") ? "iPorterNX : \(name)" : "iPorterNX: \(name)",
                                           description: text(.shortcutDescription))
         do {
             let url = try ShortcutProfile.write(game, texts: texts, documents: documents)

@@ -176,7 +176,7 @@ struct LibraryView: View {
         VStack(spacing: 10) {
             Image(systemName: "square.grid.2x2").font(.system(size: 34)).foregroundStyle(Ink.secondary)
             Text("No games built yet").font(.system(size: 15, weight: .medium)).foregroundStyle(Ink.primary)
-            Text("Point NXPocket at a folder that holds your own game dump, and it builds a package you can send to the phone.")
+            Text("Point iPorterNX at a folder that holds your own game dump, and it builds a package you can send to the phone.")
                 .font(.system(size: 12)).foregroundStyle(Ink.secondary).multilineTextAlignment(.center).frame(maxWidth: 420)
             Button("Build a game") { model.screen = .build }
                 .buttonStyle(.borderedProminent).tint(Ink.accent).foregroundStyle(.black)

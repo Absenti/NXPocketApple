@@ -3,16 +3,16 @@ import XCTest
 @testable import NXShellHost
 
 final class UpdateChannelTests: XCTestCase {
-    /// A source as AltStore and SideStore read it, NXPocket among other apps, its versions out of order.
+    /// A source as AltStore and SideStore read it, iPorterNX among other apps, its versions out of order.
     private let source = Data("""
-    {"name": "NXPocket", "identifier": "dev.nxpocket.source", "apps": [
+    {"name": "iPorterNX", "identifier": "dev.nxpocket.source", "apps": [
       {"name": "Other", "bundleIdentifier": "com.example.other", "versions": [{"version": "9.9.9"}]},
-      {"name": "NXPocket", "bundleIdentifier": "dev.nxpocket.app", "developerName": "NXPocket",
+      {"name": "iPorterNX", "bundleIdentifier": "dev.nxpocket.app", "developerName": "iPorterNX",
        "versions": [
          {"version": "0.2.0", "buildVersion": "7", "date": "2026-11-11T20:00:00Z", "size": 20000000,
-          "downloadURL": "https://github.com/Absenti/NXPocket/releases/download/v0.2.0/NXPocket.ipa"},
+          "downloadURL": "https://github.com/Absenti/iPorterNX/releases/download/v0.2.0/iPorterNX.ipa"},
          {"version": "0.10.0", "buildVersion": "12", "date": "2026-12-01", "size": 21000000,
-          "downloadURL": "https://github.com/Absenti/NXPocket/releases/download/v0.10.0/NXPocket.ipa"},
+          "downloadURL": "https://github.com/Absenti/iPorterNX/releases/download/v0.10.0/iPorterNX.ipa"},
          {"version": "not a version"}
        ]}
     ]}
@@ -23,14 +23,14 @@ final class UpdateChannelTests: XCTestCase {
         XCTAssertEqual(release.version, "0.10.0", "0.10.0 is newer than 0.2.0: versions compare as numbers")
         XCTAssertEqual(release.build, "12")
         XCTAssertEqual(release.size, 21_000_000)
-        XCTAssertEqual(release.downloadURL?.lastPathComponent, "NXPocket.ipa")
+        XCTAssertEqual(release.downloadURL?.lastPathComponent, "iPorterNX.ipa")
         XCTAssertNotNil(release.date, "a date alone, without a time, reads too")
     }
 
     func testAnOlderSourceWithTheVersionOnTheAppReads() throws {
         let legacy = Data("""
         {"apps": [{"bundleIdentifier": "dev.nxpocket.app", "version": "0.3.1", "versionDate": "2026-12-24",
-                   "downloadURL": "https://example.invalid/NXPocket.ipa", "size": 5}]}
+                   "downloadURL": "https://example.invalid/iPorterNX.ipa", "size": 5}]}
         """.utf8)
         XCTAssertEqual(UpdateChannel.newestRelease(in: legacy)?.version, "0.3.1")
         XCTAssertNil(UpdateChannel.newestRelease(in: Data(#"{"apps": []}"#.utf8)))
@@ -50,7 +50,7 @@ final class UpdateChannelTests: XCTestCase {
 
     func testTheSideStoreLinkCarriesTheSourceAddressEncoded() {
         XCTAssertEqual(UpdateChannel.addSourceURL.absoluteString,
-                       "sidestore://source?url=https%3A%2F%2Fgithub.com%2FAbsenti%2FNXPocket%2Freleases%2Flatest%2Fdownload%2Fsource.json")
+                       "sidestore://source?url=https%3A%2F%2Fgithub.com%2FAbsenti%2FiPorterNX%2Freleases%2Flatest%2Fdownload%2Fsource.json")
     }
 
     func testTheCheckIsOneGetThatSendsNothingAndAPrivateRepositoryIsNoError() async {

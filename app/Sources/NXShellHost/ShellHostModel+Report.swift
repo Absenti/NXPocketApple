@@ -10,7 +10,7 @@ extension ShellHostModel {
 
     /// `error` as the screen showed it; the game's last log when `titleID` names one, the app's log when `appLog`.
     public func report(error: String, titleID: String? = nil, appLog: Bool = false, now: Date = Date()) -> String {
-        var lines = ["NXPocket report, \(now.formatted(.iso8601))", "", "error: \(error)"]
+        var lines = ["iPorterNX report, \(now.formatted(.iso8601))", "", "error: \(error)"]
         if let dlerror = FrameworkLoader.lastDlerror { lines.append("dlerror: \(dlerror)") }
 
         if let titleID {
@@ -33,7 +33,7 @@ extension ShellHostModel {
 
         lines.append("")
         let info = Bundle.main.infoDictionary
-        lines.append("app: NXPocket \(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))")
+        lines.append("app: iPorterNX \(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))")
         lines.append("iOS \(UIDevice.current.systemVersion), \(Self.deviceModel)")
         lines.append("memory: \(MemoryBudget.availableText) available of \(MemoryBudget.physicalText), "
                      + "increased limit \(MemoryBudget.hasIncreasedLimit ? "yes" : "no")")

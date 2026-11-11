@@ -327,7 +327,7 @@ enum TouchLayoutEditorWindow {
         self.window = window
         controller.setNeedsUpdateOfSupportedInterfaceOrientations()
         scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape)) { error in
-            NSLog("NXPocket: the layout editor stays upright: %@", error.localizedDescription)
+            NSLog("iPorterNX: the layout editor stays upright: %@", error.localizedDescription)
         }
     }
 

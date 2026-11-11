@@ -59,7 +59,7 @@ case "$MODE" in
 
     say "ad-hoc signing the placeholders (SideStore replaces every signature on install)"
     xattr -cr "$APP_PATH" 2>/dev/null || true
-    ENTITLEMENTS=$APP/Gen/NXPocket.entitlements
+    ENTITLEMENTS=$APP/Gen/iPorterNX.entitlements
     if [ -f "$ENTITLEMENTS" ]; then
         # The increased-memory entitlement has to be requested here, or the ad-hoc signature drops it and the
         # installer has nothing to carry into the profile it builds for the device.
@@ -74,10 +74,10 @@ case "$MODE" in
     rm -rf "$APP/.pkg" && mkdir -p "$APP/.pkg/Payload"
     cp -R "$APP_PATH" "$APP/.pkg/Payload/"
     mkdir -p "$OUT"
-    rm -f "$OUT/NXPocket.ipa"
-    (cd "$APP/.pkg" && zip -qry "$OUT/NXPocket.ipa" Payload)
+    rm -f "$OUT/iPorterNX.ipa"
+    (cd "$APP/.pkg" && zip -qry "$OUT/iPorterNX.ipa" Payload)
     rm -rf "$APP/.pkg"
-    say "IPA: $OUT/NXPocket.ipa ($(du -h "$OUT/NXPocket.ipa" | cut -f1 | tr -d ' '))"
+    say "IPA: $OUT/iPorterNX.ipa ($(du -h "$OUT/iPorterNX.ipa" | cut -f1 | tr -d ' '))"
     echo "Install it with SideStore or AltStore, then export the .p12 from SideStore and import it in the app."
     ;;
 *)

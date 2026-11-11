@@ -106,7 +106,7 @@ private struct ExportLine: View {
                 Text("Uploading to iCloud: the iPhone sees it once this is done.").font(.system(size: 11)).foregroundStyle(Ink.secondary)
             }
         case .inCloud:
-            Text("In iCloud Drive → Downloads. On the iPhone, in NXPocket: touch and hold \(game), Import a save (Importer une sauvegarde), then Browse → iCloud Drive → Downloads → \(file). The game must be on the iPhone; the app checks the copy is this game's and whole, and keeps the saves it replaces in Files → NXPocket → Saves.")
+            Text("In iCloud Drive → Downloads. On the iPhone, in iPorterNX: touch and hold \(game), Import a save (Importer une sauvegarde), then Browse → iCloud Drive → Downloads → \(file). The game must be on the iPhone; the app checks the copy is this game's and whole, and keeps the saves it replaces in Files → iPorterNX → Saves.")
                 .font(.system(size: 11)).foregroundStyle(Ink.primary).fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
         case .failed(let reason):

@@ -22,7 +22,7 @@ final class PhoneAppTests: XCTestCase {
         let plist: [String: Any] = ["CFBundleShortVersionString": "0.1", "CFBundleVersion": "7", "CFBundleIdentifier": "dev.nxpocket.app"]
         try PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0)
             .write(to: app.appendingPathComponent("Info.plist"))
-        let ipa = folder.appendingPathComponent("NXPocket.ipa")
+        let ipa = folder.appendingPathComponent("iPorterNX.ipa")
         let zip = Process()
         zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
         zip.currentDirectoryURL = folder.appendingPathComponent("pkg")
@@ -36,7 +36,7 @@ final class PhoneAppTests: XCTestCase {
     }
 
     func testFindsTheRepositoryAboveTheLauncher() throws {
-        let repository = folder.appendingPathComponent("NXPocket")
+        let repository = folder.appendingPathComponent("iPorterNX")
         let executable = repository.appendingPathComponent("mac/.build/release/NXPocket")
         try FileManager.default.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: repository.appendingPathComponent("tools"), withIntermediateDirectories: true)
@@ -45,7 +45,7 @@ final class PhoneAppTests: XCTestCase {
         try Data().write(to: repository.appendingPathComponent("app/project.yml"))
         try Data().write(to: executable)
         XCTAssertEqual(PhoneAppBuild.repository(from: executable)?.resolvingSymlinksInPath().path, repository.resolvingSymlinksInPath().path)
-        XCTAssertNil(PhoneAppBuild.repository(from: folder.appendingPathComponent("elsewhere/NXPocket")))
+        XCTAssertNil(PhoneAppBuild.repository(from: folder.appendingPathComponent("elsewhere/iPorterNX")))
 
         let source = repository.appendingPathComponent("app/Sources/A.swift")
         try Data("x".utf8).write(to: source)

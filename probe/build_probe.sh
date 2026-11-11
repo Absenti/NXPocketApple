@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the NXPocket probe IPA (README.md explains the tests) with plain clang, no Xcode project.
+# Build the iPorterNX probe IPA (README.md explains the tests) with plain clang, no Xcode project.
 # Shape taken from nxnative's dm/ios/probe/build_probe.sh (MIT, seedds).
 #   Payload/NXProbe.app/
 #     NXProbe                                  the app: runs the tests at launch, log on screen and in Documents/probe-log.txt

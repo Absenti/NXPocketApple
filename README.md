@@ -1,4 +1,4 @@
-# NXPocket
+# iPorterNX
 
 Play your own Switch games on your iPhone. A Mac launcher builds them from your dumps; an iPhone app signs and runs
 them, without reinstalling the app for each game.
@@ -22,12 +22,12 @@ them, without reinstalling the app for each game.
 
 ## Install
 
-1. **Mac:** download `NXPocket-Launcher.zip` from the [latest release](https://github.com/Absenti/NXPocket/releases/latest),
-   move `NXPocket.app` to Applications, and open it with right-click → Open the first time. Its **Setup** screen
+1. **Mac:** download `iPorterNX-Launcher.zip` from the [latest release](https://github.com/Absenti/iPorterNX/releases/latest),
+   move `iPorterNX.app` to Applications, and open it with right-click → Open the first time. Its **Setup** screen
    installs the rest (Python, XcodeGen, the engine), every download pinned and checked. No Homebrew, no admin password.
-2. **iPhone:** in SideStore, add this source and install NXPocket from it:
-   `https://github.com/Absenti/NXPocket/releases/latest/download/source.json`
-3. Export the certificate from SideStore as a `.p12`, then import it in NXPocket: **Settings → Certificate**.
+2. **iPhone:** in SideStore, add this source and install iPorterNX from it:
+   `https://github.com/Absenti/iPorterNX/releases/latest/download/source.json`
+3. Export the certificate from SideStore as a `.p12`, then import it in iPorterNX: **Settings → Certificate**.
 4. In the launcher, pick your games folder and `prod.keys`, build, and send.
 
 Never install the IPA by opening it from Files: iOS installs a second copy that will not start.
@@ -40,7 +40,7 @@ The launcher updates itself from GitHub releases. SideStore updates the iPhone a
 
 ```bash
 tools/bootstrap.sh                     # engine and patches
-tools/build_mac.sh --app               # launcher -> mac/.build/NXPocket.app
+tools/build_mac.sh --app               # launcher -> mac/.build/iPorterNX.app
 tools/build_zsign.sh                   # on-device signer (zsign + OpenSSL, pinned)
 tools/build_app.sh --device-unsigned   # IPA for SideStore
 ```

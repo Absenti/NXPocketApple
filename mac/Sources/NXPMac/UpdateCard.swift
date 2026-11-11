@@ -11,7 +11,7 @@ struct UpdateCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     SectionHeading(text: "Updates")
-                    Text(model.runningVersion.map { "NXPocket \($0.description)" } ?? "development build")
+                    Text(model.runningVersion.map { "iPorterNX \($0.description)" } ?? "development build")
                         .font(.system(size: 11, design: .monospaced)).foregroundStyle(Ink.secondary)
                     Spacer()
                     Button("Check for updates") { model.checkForUpdates() }
@@ -53,7 +53,7 @@ struct UpdateCard: View {
         case .downloading(let release, let fraction):
             VStack(alignment: .leading, spacing: 4) {
                 if let fraction { Bar(fraction: fraction) } else { ProgressView().progressViewStyle(.linear) }
-                Text("Downloading and checking NXPocket \(release.version.description)…").font(.system(size: 11)).foregroundStyle(Ink.secondary)
+                Text("Downloading and checking iPorterNX \(release.version.description)…").font(.system(size: 11)).foregroundStyle(Ink.secondary)
             }
         case .restarting:
             Text("Installed: the launcher quits and the new one opens.").font(.system(size: 11)).foregroundStyle(Ink.good)

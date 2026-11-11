@@ -4,7 +4,7 @@
 Usage: make_source.py <ipa> <version> <build> <download-url> <out.json>
 
 The source lists one app, dev.nxpocket.app, at the release's version. SideStore reads it from the stable URL
-https://github.com/Absenti/NXPocket/releases/latest/download/source.json, offers the update when the version is newer
+https://github.com/Absenti/iPorterNX/releases/latest/download/source.json, offers the update when the version is newer
 than the installed one, and checks that the IPA asks for no entitlement the source does not declare.
 """
 import json
@@ -16,8 +16,8 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 
-REPO = "https://github.com/Absenti/NXPocket"
-ICON = "https://raw.githubusercontent.com/Absenti/NXPocket/main/app/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
+REPO = "https://github.com/Absenti/iPorterNX"
+ICON = "https://raw.githubusercontent.com/Absenti/iPorterNX/main/app/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
 
 
 def app_facts(ipa):
@@ -47,18 +47,18 @@ def main():
     if info.get("CFBundleShortVersionString") != version:
         sys.exit(f"the IPA is version {info.get('CFBundleShortVersionString')}, the release is {version}")
     source = {
-        "name": "NXPocket",
+        "name": "iPorterNX",
         "identifier": "dev.nxpocket.source",
         "subtitle": "Your own Switch games, built on your Mac, played on your iPhone.",
         "website": REPO,
         "sourceURL": f"{REPO}/releases/latest/download/source.json",
         "iconURL": ICON,
         "apps": [{
-            "name": "NXPocket",
+            "name": "iPorterNX",
             "bundleIdentifier": "dev.nxpocket.app",
-            "developerName": "NXPocket",
-            "subtitle": "Plays the games the NXPocket launcher builds on your Mac.",
-            "localizedDescription": "Imports the games the NXPocket launcher builds on your Mac from your own dumps, "
+            "developerName": "iPorterNX",
+            "subtitle": "Plays the games the iPorterNX launcher builds on your Mac.",
+            "localizedDescription": "Imports the games the iPorterNX launcher builds on your Mac from your own dumps, "
                                     "signs them on the iPhone and plays them. It ships no key, no firmware and no game.",
             "iconURL": ICON,
             "category": "games",
@@ -66,7 +66,7 @@ def main():
                 "version": version,
                 "buildVersion": build,
                 "date": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "localizedDescription": f"NXPocket {version}. Release notes: {REPO}/releases/tag/v{version}",
+                "localizedDescription": f"iPorterNX {version}. Release notes: {REPO}/releases/tag/v{version}",
                 "downloadURL": url,
                 "size": os.path.getsize(ipa),
                 "minOSVersion": info.get("MinimumOSVersion", "26.0"),

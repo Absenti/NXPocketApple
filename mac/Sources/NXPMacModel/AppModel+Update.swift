@@ -42,12 +42,12 @@ extension AppModel {
         Task {
             switch await LauncherUpdate.latest(current: current) {
             case .upToDate(let latest):
-                update = .upToDate("NXPocket \(current?.description ?? "?") is up to date (latest release \(latest)).")
+                update = .upToDate("iPorterNX \(current?.description ?? "?") is up to date (latest release \(latest)).")
             case .noPublicChannel:
                 update = .noChannel
             case .available(let release):
                 update = .available(release)
-                append("update: NXPocket \(release.version) is available")
+                append("update: iPorterNX \(release.version) is available")
             case .failed(let reason):
                 update = .failed(reason)
             }
@@ -67,7 +67,7 @@ extension AppModel {
         let app = Bundle.main.bundleURL
         let current = runningVersion
         update = .downloading(release, fraction: 0)
-        append("update: downloading NXPocket \(release.version)")
+        append("update: downloading iPorterNX \(release.version)")
         let (events, sink) = AsyncStream.makeStream(of: Double?.self)
         Task {
             let reader = Task { @MainActor in
@@ -87,7 +87,7 @@ extension AppModel {
                 do {
                     try LauncherUpdate.startSwap(app: app, newApp: newApp, version: current)
                     update = .restarting
-                    append("update: NXPocket \(release.version) checked; the launcher quits and the new one opens")
+                    append("update: iPorterNX \(release.version) checked; the launcher quits and the new one opens")
                     NSApplication.shared.terminate(nil)
                 } catch {
                     update = .failed("The update could not start: \(error.localizedDescription)")

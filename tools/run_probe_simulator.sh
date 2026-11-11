@@ -22,9 +22,9 @@ die() { printf '\033[31mFAIL: %s\033[0m\n' "$*" >&2; exit 1; }
 say "1. a certificate chain, and a provisioning profile naming team $TEAM"
 rm -rf "$WORK" && mkdir -p "$WORK"
 openssl req -x509 -newkey rsa:2048 -keyout "$WORK/ca-key.pem" -out "$WORK/ca.pem" -days 30 -nodes \
-    -subj "/CN=NXPocket probe CA/O=NXPocket/C=FR" 2>/dev/null || die "CA"
+    -subj "/CN=iPorterNX probe CA/O=iPorterNX/C=FR" 2>/dev/null || die "CA"
 openssl req -newkey rsa:2048 -keyout "$WORK/key.pem" -out "$WORK/leaf.csr" -nodes \
-    -subj "/CN=Apple Development: NXPocket probe ($TEAM)/OU=$TEAM/O=NXPocket/C=FR" 2>/dev/null || die "leaf key"
+    -subj "/CN=Apple Development: iPorterNX probe ($TEAM)/OU=$TEAM/O=iPorterNX/C=FR" 2>/dev/null || die "leaf key"
 cat > "$WORK/leaf.ext" <<'EOF'
 basicConstraints=critical,CA:FALSE
 keyUsage=critical,digitalSignature
@@ -35,12 +35,12 @@ openssl x509 -req -in "$WORK/leaf.csr" -CA "$WORK/ca.pem" -CAkey "$WORK/ca-key.p
 # The p12 must carry its issuer: GenerateCMS prefers a CA chain inside the p12 and otherwise demands an Apple WWDR
 # intermediate. A real SideStore export carries the intermediate for the same reason.
 openssl pkcs12 -export -inkey "$WORK/key.pem" -in "$WORK/cert.pem" -certfile "$WORK/ca.pem" -out "$WORK/cert.p12" \
-    -passout "pass:$PASSPHRASE" -name "NXPocket probe" 2>/dev/null || die "p12"
+    -passout "pass:$PASSPHRASE" -name "iPorterNX probe" 2>/dev/null || die "p12"
 cat > "$WORK/profile.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Name</key><string>NXPocket probe profile</string>
+  <key>Name</key><string>iPorterNX probe profile</string>
   <key>TeamIdentifier</key><array><string>$TEAM</string></array>
   <key>UUID</key><string>00000000-0000-0000-0000-0000000000FE</string>
   <key>ExpirationDate</key><date>2030-01-01T00:00:00Z</date>

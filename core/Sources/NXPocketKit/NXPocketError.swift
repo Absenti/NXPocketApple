@@ -1,6 +1,6 @@
 import Foundation
 
-/// Every failure NXPocket reports, with a stable code the UI and the tests match on.
+/// Every failure iPorterNX reports, with a stable code the UI and the tests match on.
 public struct NXPocketError: Error, Equatable, Sendable, CustomStringConvertible {
     public enum Code: String, Sendable {
         case packageMissing

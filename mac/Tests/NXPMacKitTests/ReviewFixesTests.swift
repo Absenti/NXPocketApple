@@ -80,8 +80,8 @@ final class WorkFolderTests: XCTestCase {
                                  titles: [PackageTitle(titleID: 0x0100AAAA00010000, kind: .base, version: 0)], source: .name)
         let game = GameFolder.group([(package: base, contents: nil)]).games[0]
         XCTAssertEqual(try game.plan(.defaults(for: game)).workFolder.path, "/Volumes/Dumps/0100AAAA00010000_build")
-        let elsewhere = try game.plan(.defaults(for: game), workRoot: URL(fileURLWithPath: "/Users/me/NXPocket work"))
-        XCTAssertEqual(elsewhere.workFolder.path, "/Users/me/NXPocket work/0100AAAA00010000_build")
+        let elsewhere = try game.plan(.defaults(for: game), workRoot: URL(fileURLWithPath: "/Users/me/iPorterNX work"))
+        XCTAssertEqual(elsewhere.workFolder.path, "/Users/me/iPorterNX work/0100AAAA00010000_build")
         XCTAssertEqual(elsewhere.inputFolder.deletingLastPathComponent(), elsewhere.workFolder, "the links live in it too")
     }
 }

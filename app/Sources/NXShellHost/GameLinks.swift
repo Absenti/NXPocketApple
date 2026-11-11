@@ -89,7 +89,7 @@ public enum ShortcutProfile {
         let profile: [String: Any] = [
             "PayloadType": "Configuration", "PayloadVersion": 1,
             "PayloadIdentifier": "dev.nxpocket.shortcut.\(id)", "PayloadUUID": uuid("profile.\(id)"),
-            "PayloadDisplayName": texts.displayName, "PayloadOrganization": "NXPocket",
+            "PayloadDisplayName": texts.displayName, "PayloadOrganization": "iPorterNX",
             "PayloadDescription": texts.description, "PayloadRemovalDisallowed": false,
             "PayloadContent": [clip],
         ]

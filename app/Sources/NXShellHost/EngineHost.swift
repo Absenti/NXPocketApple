@@ -23,7 +23,7 @@ public func makeDefaultEngineHost() -> EngineHost { FrameworkEngineHost.shared }
 
 /// A host that starts nothing, for the tests and for a build that is not meant to run games.
 public struct UnlinkedEngineHost: EngineHost {
-    public static let reason = "This build of NXPocket cannot start games: it can import, verify and sign them."
+    public static let reason = "This build of iPorterNX cannot start games: it can import, verify and sign them."
 
     public init() {}
     public var isAvailable: Bool { false }
@@ -185,7 +185,7 @@ public final class FrameworkEngineHost: EngineHost {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "?"
         let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "shell: NXPocket \(version) (\(build)), iOS \(UIDevice.current.systemVersion), \(Date().formatted(.iso8601))"
+        return "shell: iPorterNX \(version) (\(build)), iOS \(UIDevice.current.systemVersion), \(Date().formatted(.iso8601))"
     }
 
     /// Metal reads `MTL_HUD_ENABLED` when the process makes its first device, long before a game starts, so the HUD

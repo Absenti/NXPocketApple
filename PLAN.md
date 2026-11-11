@@ -1,4 +1,4 @@
-# NXPocket : plan d'implémentation (version robuste)
+# iPorterNX : plan d'implémentation (version robuste)
 
 Ce plan est destiné à l'agent qui code (DeepSeek). Claude fait la revue à la fin de chaque phase. **Arrête-toi à la fin de chaque phase**, puis livre :
 - le diff ;
@@ -9,7 +9,7 @@ Ne passe pas à la phase suivante sans revue.
 
 ## 0. But et règles
 
-**But.** Une app iPhone et iPad, NXPocket, qui reçoit des jeux Switch déjà convertis par l'ordinateur de l'utilisateur, et les ajoute à sa bibliothèque **sans être réinstallée**.
+**But.** Une app iPhone et iPad, iPorterNX, qui reçoit des jeux Switch déjà convertis par l'ordinateur de l'utilisateur, et les ajoute à sa bibliothèque **sans être réinstallée**.
 - Le jeu est lancé depuis l'app : ce n'est jamais une nouvelle app.
 - L'ordinateur fait la conversion avec nxnative : déchiffrement avec les `prod.keys` de l'utilisateur, réécriture du code, shaders.
 - L'app stocke les données du jeu dans `Documents`, sans réinstallation.
@@ -75,7 +75,7 @@ On ne l'utilise que si la phase 0c échoue. L'app recopie son bundle en y ajouta
 ## Phase 1 : dépôt et base
 
 1.1 Prépare le dépôt :
-- `git init` dans `NXPocket/` ;
+- `git init` dans `iPorterNX/` ;
 - un `.gitignore` qui ignore `probe/build/`, `probe-out/`, `engine/`, `build/`, `*.ipa`, `DerivedData/`, et `*.keys`, `*.p12`, `*.mobileprovision` (pour qu'un fichier sensible ne soit jamais ajouté par erreur) ;
 - une licence MIT avec un `NOTICE` qui crédite nxnative (seedds, MIT) et NX2Apple (MIT) ;
 - un `README.md` court : ce que fait l'app, ce qu'elle ne fait pas (aucune clé ni aucun jeu fourni), et l'avertissement légal.
@@ -87,7 +87,7 @@ On ne l'utilise que si la phase 0c échoue. L'app recopie son bundle en y ajouta
 - Le script échoue clairement si un patch ne s'applique plus.
 - Il est idempotent : il vérifie d'abord avec `git apply --check -R` si le patch est déjà appliqué.
 
-1.4 Récupère les vues : le shell utilise le package Swift `third_party/NX2Apple/frontend-ios` tel quel, via un chemin local. On ne le copie pas. Ce qui nous est propre va dans `app/Sources/NXPocket*`.
+1.4 Récupère les vues : le shell utilise le package Swift `third_party/NX2Apple/frontend-ios` tel quel, via un chemin local. On ne le copie pas. Ce qui nous est propre va dans `app/Sources/iPorterNX*`.
 
 1.5 L'app : un projet XcodeGen dans `app/project.yml`. Il part du modèle `engine/dm/ios/project-shell.yml` et du script `engine/dm/ios/tools/build_shell.sh`. Lis les deux en entier avant d'écrire quoi que ce soit.
 - Différence 1 : le shell peut être construit **sans aucun framework de jeu intégré**. Aujourd'hui, `build_shell.sh` en exige au moins un (`DM_SHELL_FRAMEWORKS`). Chaque framework embarque son propre hôte (voir `ShellGlue.h`), donc le shell lui-même n'a pas besoin de l'hôte. Vérifie-le dans `ShellMain.m`. Si c'est faux, arrête-toi et signale-le dans la revue.

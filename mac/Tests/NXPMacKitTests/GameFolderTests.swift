@@ -245,7 +245,7 @@ final class GameFolderTests: XCTestCase {
     }
 
     func testReadsDevicectlsAppListing() {
-        let json = #"{"result":{"apps":[{"bundleIdentifier":"dev.nxpocket.app.ABCDE12345","name":"NXPocket"},{"name":"x"}]}}"#
+        let json = #"{"result":{"apps":[{"bundleIdentifier":"dev.nxpocket.app.ABCDE12345","name":"iPorterNX"},{"name":"x"}]}}"#
         XCTAssertEqual(DeviceTransfer.bundleIDs(inAppsListing: Data(json.utf8)), ["dev.nxpocket.app.ABCDE12345"])
     }
 }
@@ -286,7 +286,7 @@ final class TransferFailureTests: XCTestCase {
         let cause = NXPocketError(.transferFailed, "the device was disconnected")
         let marked = DeviceTransfer.failure(cause, partialCopyMarked: true)
         XCTAssertEqual(marked.code, .transferFailed)
-        XCTAssertEqual(marked.detail, "the device was disconnected (NXPocket on the iPhone deletes the part already sent when it next opens)")
+        XCTAssertEqual(marked.detail, "the device was disconnected (iPorterNX on the iPhone deletes the part already sent when it next opens)")
         let left = DeviceTransfer.failure(cause, partialCopyMarked: false)
         XCTAssertTrue(left.detail.hasPrefix("the device was disconnected (the part already sent is still on the iPhone"))
         XCTAssertTrue(left.detail.contains("10 minutes"), left.detail)

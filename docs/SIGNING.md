@@ -47,7 +47,7 @@ iPhone 15 Pro, iOS 27.0.1, free Apple ID, 2026-11-10, first run of a fresh proce
 So outside the bundle, iOS accepts code that was signed **on this device** with **the signature identifier of the app
 that loads it** and **the app's own entitlements**. The identifier alone is not enough: 5A has it and is refused,
 and so is test 2's copy, which SideStore signed with the framework's own identifier and no entitlements. That is
-what NXPocket does:
+what iPorterNX does:
 
 - the framework is signed at import, and again whenever the certificate changes;
 - the identifier used is read from the running app's own CodeDirectory (`AppSignature.currentIdentifier`), so it
@@ -81,7 +81,7 @@ and refuses to sign rather than leaving behind a framework iOS would reject.
 
 Three things that only showed up once the real API was read, and that the earlier draft of this document got wrong:
 
-- **LiveContainer's `ZSign/` directory is AGPL-3.0**, not a source NXPocket may take code from. It implements the
+- **LiveContainer's `ZSign/` directory is AGPL-3.0**, not a source iPorterNX may take code from. It implements the
   same API, but this project is MIT and PLAN.md forbids AGPL outright. The shim calls zsign's own C++ API instead.
 - **zsign takes the team ID and the entitlements from the provisioning profile, not from the certificate.** Signing
   with a `.p12` alone fails with `Can't find TeamId!`. The app must therefore pass its own `embedded.mobileprovision`,
@@ -132,7 +132,7 @@ port. The probe measured 7 to 20 MB/s for signing, so a 200 MB framework takes a
 
 ## The seven-day certificate
 
-With a free Apple ID the certificate expires after seven days and SideStore refreshes the app weekly. NXPocket
+With a free Apple ID the certificate expires after seven days and SideStore refreshes the app weekly. iPorterNX
 records the SHA-256 of the certificate that signed each game in `Documents/games/<title ID>/.signing.json` together
 with its expiry, and re-signs a game when
 

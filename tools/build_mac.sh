@@ -7,7 +7,7 @@
 # The check fails the build if that drifts back.
 #
 # Usage: tools/build_mac.sh                    build, then check
-#        tools/build_mac.sh --app              the same, then mac/.build/NXPocket.app around it (ad hoc signed)
+#        tools/build_mac.sh --app              the same, then mac/.build/iPorterNX.app around it (ad hoc signed)
 #        tools/build_mac.sh --check <binary>   only the check
 #
 # The .app: bundle ID dev.nxpocket.launcher, CFBundleShortVersionString from VERSION at the repository root (a
@@ -57,7 +57,7 @@ BUILD=${BUILD_NUMBER:-1}
 MINOS=$(otool -l "$BINARY" | awk '/cmd LC_BUILD_VERSION/ { f = 1 } f && $1 == "minos" { print $2; exit }')
 [ -n "$MINOS" ] || die "$BINARY records no minimum macOS"
 
-APP=$ROOT/mac/.build/NXPocket.app
+APP=$ROOT/mac/.build/iPorterNX.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINARY" "$APP/Contents/MacOS/NXPocket"
@@ -85,8 +85,8 @@ cat > "$APP/Contents/Info.plist" <<EOF
 <dict>
     <key>CFBundleExecutable</key><string>NXPocket</string>
     <key>CFBundleIdentifier</key><string>dev.nxpocket.launcher</string>
-    <key>CFBundleName</key><string>NXPocket</string>
-    <key>CFBundleDisplayName</key><string>NXPocket</string>
+    <key>CFBundleName</key><string>iPorterNX</string>
+    <key>CFBundleDisplayName</key><string>iPorterNX</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>

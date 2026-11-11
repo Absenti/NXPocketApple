@@ -42,14 +42,14 @@ final class ShortcutProfileTests: XCTestCase {
     override func tearDown() { fixture.remove() }
 
     func testTheProfileHoldsOneWebClipOpeningTheGameWithIdentifiersThatOnlyTheTitleIDDecides() throws {
-        let texts = ShortcutProfile.Texts(label: "South Park", displayName: "NXPocket : South Park", description: "d")
+        let texts = ShortcutProfile.Texts(label: "South Park", displayName: "iPorterNX : South Park", description: "d")
         let url = try ShortcutProfile.write(fixture.game, texts: texts, documents: fixture.documents)
         XCTAssertEqual(url.path, fixture.documents.appendingPathComponent("Shortcuts/South Park.mobileconfig").path)
         let profile = try XCTUnwrap(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
         XCTAssertEqual(profile["PayloadType"] as? String, "Configuration")
         XCTAssertEqual(profile["PayloadIdentifier"] as? String, "dev.nxpocket.shortcut.\(LibraryFixture.titleID)")
-        XCTAssertEqual(profile["PayloadDisplayName"] as? String, "NXPocket : South Park")
-        XCTAssertEqual(profile["PayloadOrganization"] as? String, "NXPocket")
+        XCTAssertEqual(profile["PayloadDisplayName"] as? String, "iPorterNX : South Park")
+        XCTAssertEqual(profile["PayloadOrganization"] as? String, "iPorterNX")
         let clips = try XCTUnwrap(profile["PayloadContent"] as? [[String: Any]])
         XCTAssertEqual(clips.count, 1)
         let clip = clips[0]

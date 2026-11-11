@@ -120,13 +120,13 @@ extension AppModel {
                 if isCancelled(item.id) { throw NXPocketError(.cancelled, "cancelled after the build") }
                 if let device {
                     try await send(item.id, package: package, to: device)
-                    update(item.id) { $0.phase = .done("built and sent: open NXPocket on the iPhone to import it") }
+                    update(item.id) { $0.phase = .done("built and sent: open iPorterNX on the iPhone to import it") }
                 } else {
                     update(item.id) { $0.phase = .done("built \(plan.versionTag ?? "")") }
                 }
             case .send(let package, let device):
                 try await send(item.id, package: package, to: device)
-                update(item.id) { $0.phase = .done("sent: open NXPocket on the iPhone to import it") }
+                update(item.id) { $0.phase = .done("sent: open iPorterNX on the iPhone to import it") }
             }
         } catch let error as NXPocketError where error.code == .cancelled {
             update(item.id) { $0.phase = .cancelled }

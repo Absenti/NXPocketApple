@@ -1,4 +1,4 @@
-// NXPocket probe: can a sideloaded app load game code that is NOT inside its bundle?
+// iPorterNX probe: can a sideloaded app load game code that is NOT inside its bundle?
 // The question for a shell app that receives games without being reinstalled: a framework placed in
 // Documents/, signed with the same team as the app, must dlopen, run, and give its __TEXT pages to
 // vm_remap. An ad-hoc-only framework must be refused (otherwise a success proves nothing).
@@ -348,7 +348,7 @@ static void run_probe(void) {
     NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
     NSString *bundle = NSBundle.mainBundle.bundlePath;
     struct utsname u; uname(&u);
-    L(@"---- NXPocket probe %@ (built %s %s) ----", [NSDate date], __DATE__, __TIME__);
+    L(@"---- iPorterNX probe %@ (built %s %s) ----", [NSDate date], __DATE__, __TIME__);
     L(@"iOS %@, %s, bundle %@", UIDevice.currentDevice.systemVersion, u.machine, bundle);
 
     // 1. Baseline: a framework inside the bundle, re-signed by the sideloader (nxnative's DmProbe result).
