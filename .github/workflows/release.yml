@@ -1,0 +1,75 @@
+# A tag v<VERSION> publishes a release: the launcher as an app, the iPhone app's IPA, the SideStore source and the
+# checksums. The launcher and the iPhone app read these exact asset names to update themselves.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (v<VERSION>), already pushed'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - name: the tag is the version
+        run: |
+          VERSION=$(tr -d '[:space:]' < VERSION)
+          [ "$TAG" = "v$VERSION" ] || { echo "tag $TAG does not match VERSION $VERSION"; exit 1; }
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "NXPOCKET_OUTPUT=$RUNNER_TEMP/out" >> "$GITHUB_ENV"
+      - name: Xcode
+        run: .github/scripts/select_xcode.sh
+      - name: git reads GitHub with the workflow's token (anonymous clones from runners are refused)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh auth setup-git
+      - name: Python 3.14 (the pinned packages have wheels for it)
+        id: python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: tools
+        run: |
+          brew install xcodegen
+          NXPOCKET_BASE_PYTHON=${{ steps.python.outputs.python-path }} tools/setup_python.sh
+      - name: core and mac tests
+        run: |
+          swift test --package-path core
+          swift test --package-path mac
+      - name: launcher app
+        run: |
+          tools/build_mac.sh --app
+          mkdir -p "$NXPOCKET_OUTPUT"
+          ditto -c -k --keepParent mac/.build/NXPocket.app "$NXPOCKET_OUTPUT/NXPocket-Launcher.zip"
+      - name: iPhone app
+        run: |
+          tools/build_zsign.sh
+          tools/build_app.sh --device-unsigned
+      - name: SideStore source and checksums
+        run: |
+          cd "$NXPOCKET_OUTPUT"
+          python3 "$GITHUB_WORKSPACE/tools/make_source.py" NXPocket.ipa "$VERSION" "$BUILD_NUMBER" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/NXPocket.ipa" source.json
+          shasum -a 256 NXPocket-Launcher.zip NXPocket.ipa source.json > SHA256SUMS
+          cat SHA256SUMS
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd "$NXPOCKET_OUTPUT"
+          gh release create "$TAG" NXPocket-Launcher.zip NXPocket.ipa source.json SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --title "NXPocket $VERSION" --generate-notes --verify-tag

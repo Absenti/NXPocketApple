@@ -1,0 +1,58 @@
+NXPocket notice
+
+This file records where the project comes from and what it depends on. The licence text is in LICENSE.
+
+NXPocket is an independent shell: it holds a library of games, imports packages a Mac app built, signs them on the
+device, and starts one. The engine that runs a game is not part of this repository.
+
+The engine
+
+  nxnative, https://github.com/seedds/nxnative, MIT, Copyright (c) 2026 seedds.
+  NX2Apple, https://github.com/LNPANDY/NX2Apple, MIT, Copyright (c) 2026 LNPANDY and NX2Apple contributors.
+  NX2Apple is a fork of nxnative that carries the patch queue, the launcher and the shell front end.
+
+  Neither is vendored here. NX2Apple is cloned by hand into third_party/NX2Apple (or NX2APPLE_DIR), and
+  tools/bootstrap.sh runs its own `tools/engine.py sync`, which materialises the engine tree from nxnative at the
+  revision NX2Apple pins, then links it as engine/. The Mac launcher drives that tree. The iPhone app links none of it:
+  each game's framework carries its own engine host (docs/ENGINE.md).
+
+  What NXPocket reuses from them, and where:
+
+  - The RomFS image identity (FNV-1a 64 over the header and the index, `romfs_id_of_image` in
+    dm/host/romfs_identity.h). Reimplemented in core/Sources/NXPocketKit/Package/RomfsIdentity.swift, with tests.
+  - The shape of `game.manifest.json` schema 1 and its validation rules (frontend-ios/Sources/ShellHost/
+    GameManifest.swift). Reimplemented in core/Sources/NXPocketKit/Package/GameManifest.swift.
+  - The launch environment and arguments a game's engine expects (frontend-ios/Sources/ShellHost/
+    EngineLaunchPlan.swift and dm/ios/Sources/main.m's boot_env()). Reimplemented in
+    app/Sources/NXShellHost/EngineLaunchPlan.swift.
+  - The dlopen + dlsym + code-page remap the loader does (dm/ios/Shell/ShellMain.m). Reimplemented in
+    app/Sources/NXShellHost/FrameworkLoader.swift.
+  - The shell side of a game start (dm_shell_start_game and dm_shell_present_game in dm/ios/Shell/ShellMain.m, the
+    entry points of dm/ios/Shell/ShellGlue.h, the scene's focus events). Reimplemented in
+    app/Sources/NXShellHost/EngineHost.swift.
+  - The probe that decided this project's architecture (probe/, from dm/ios/probe). Kept in this repository as the
+    evidence docs/SIGNING.md cites.
+
+The signing engine
+
+  zsign, https://github.com/zhlynn/zsign, MIT, Copyright (c) 2018-2024 zhlynn.
+
+  It is not vendored: tools/build_zsign.sh fetches it at a pinned revision, checks that its LICENSE really is MIT
+  before compiling anything, and builds tools/zsign_shim.cpp against it into app/Signing/libnxzsign.a. Until that has
+  been run, the app imports and verifies games and refuses to sign one.
+
+  zsign needs OpenSSL. OpenSSL 3 is Apache-2.0, compatible with this project's MIT licence. build_zsign.sh takes
+  the prebuilt iOS slices of https://github.com/krzyzanowskim/OpenSSL at tag 3.6.5000 (OpenSSL 3.6.0), pinned by
+  revision 0a6149bff4fb00921ce0ec1811f726b166638095, and checks that its LICENSE.txt is the Apache License.
+
+Fonts in the built app
+
+  The engine stands in for the console's shared fonts with two files in the app's dm/font, both made by
+  tools/build_app.sh from Noto Sans JP (https://github.com/google/fonts, ofl/notosansjp, pinned revision and SHA-256),
+  SIL Open Font License 1.1, Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.
+  standard.ttf is its regular instance; nintendo_ext.ttf holds controller-button icons drawn by
+  tools/fonts/make_ext_font.py, copied from the NX2Apple engine tree (MIT), with letters from its bold instance.
+  Neither font is committed. No Apple font is copied into the app.
+
+Nothing else is vendored but tools/fonts/make_ext_font.py. No key, no firmware, no game file and no extracted game data is part of this repository,
+its tests or its fixtures.

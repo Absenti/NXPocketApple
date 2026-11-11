@@ -1,0 +1,170 @@
+import NXPocketKit
+import NXShellUI
+import SwiftUI
+import UIKit
+
+/// What the library says above the games, only while it matters: a launch that failed, a game on its way from the Mac,
+/// an import, a missing certificate, games to sign again. Each card says what to do in one button.
+struct LibraryNotices: View {
+    @EnvironmentObject private var model: ShellHostModel
+    let openSettings: () -> Void
+    /// A log to open, or nil for the list.
+    let openLog: (LogFile?) -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            launchCard
+            failedLaunch
+            UpdateNotice(updates: model.updates)
+            ForEach(model.receiving) { receivingCard($0) }
+            importCard
+            if model.certificate == nil {
+                NoticeCard(symbol: "key.fill", tint: ShellInk.accent, title: model.text(.certificateNeededTitle),
+                           detail: model.text(model.pendingTransfers > 0 ? .gameWaitsForCertificate : .certificateNeededBody)) {
+                    Button(model.text(.settings), action: openSettings).buttonStyle(ShellButtonStyle(prominent: true))
+                }
+            } else if !model.importState.isRunning, toSign > 0 {
+                NoticeCard(symbol: "signature", tint: ShellInk.accent,
+                           title: "\(ShellStrings.gameCount(toSign, language: model.language)) \(model.text(.toSignAgain))",
+                           detail: model.text(.signAgainBody)) {
+                    Button(model.text(.sign)) { model.resignAll() }.buttonStyle(ShellButtonStyle(prominent: true))
+                }
+            }
+        }
+    }
+
+    private var toSign: Int { model.gamesNeedingSignature().count }
+
+    @ViewBuilder
+    private var failedLaunch: some View {
+        if let marker = model.failedLaunch {
+            let game = model.games.first { $0.titleID.description == marker.titleID.description }
+            NoticeCard(game: game, symbol: "exclamationmark.triangle.fill", tint: ShellInk.bad,
+                       title: model.text(.lastLaunchFailed),
+                       detail: "\(model.title(ofTitleID: marker.titleID)) · \(marker.startedAt.formatted(date: .abbreviated, time: .shortened))") {
+                if let log = model.failedLaunchLog {
+                    Button(model.text(.log)) { openLog(log) }.buttonStyle(ShellButtonStyle(prominent: true))
+                }
+                CopyReportButton(error: model.text(.lastLaunchFailed), titleID: marker.titleID)
+                Button(model.text(.close)) { model.clearFailedLaunch() }.buttonStyle(ShellButtonStyle())
+            }
+        }
+    }
+
+    /// A start asked from a game's menu: signing it first can take minutes, and a refusal must show where it was asked.
+    @ViewBuilder
+    private var launchCard: some View {
+        switch model.launch {
+        case .launching(let what):
+            NoticeCard(symbol: "play.circle.fill", tint: ShellInk.accent, title: model.text(.starting), detail: what) { EmptyView() }
+        case .failed(let message):
+            NoticeCard(symbol: "exclamationmark.triangle.fill", tint: ShellInk.bad, title: model.text(.gameDidNotStart),
+                       detail: message) {
+                CopyReportButton(error: message, titleID: model.activeTitleID)
+                Button(model.text(.close)) { model.launch = .idle }.buttonStyle(ShellButtonStyle())
+            }
+        case .idle, .running:
+            EmptyView()
+        }
+    }
+
+    private func receivingCard(_ transfer: IncomingTransfer) -> some View {
+        let received = ByteCountFormatter.string(fromByteCount: transfer.received, countStyle: .file)
+        let detail = transfer.expected.map {
+            "\(received) \(model.text(.sizeOf)) \(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file))"
+        } ?? "\(received) \(model.text(.received))"
+        return NoticeCard(symbol: "arrow.down.circle.fill", tint: ShellInk.accent,
+                          title: "\(model.text(.receiving)) · \(transfer.title ?? model.text(.aGame))", detail: detail,
+                          progress: transfer.fraction ?? 0) { EmptyView() }
+    }
+
+    @ViewBuilder
+    private var importCard: some View {
+        switch model.importState {
+        case .running(let stage, let fraction, let detail):
+            NoticeCard(symbol: "square.and.arrow.down.fill", tint: ShellInk.accent, title: model.text(.importing),
+                       detail: detail.isEmpty ? stage : "\(stage) · \(detail)", progress: fraction) { EmptyView() }
+        case .failed(let message):
+            NoticeCard(symbol: "exclamationmark.triangle.fill", tint: ShellInk.bad, title: model.text(.importFailed),
+                       detail: message) {
+                if model.pendingTransfers > 0, model.certificate != nil {
+                    Button(model.text(.tryAgainImport)) { model.importPendingTransfers() }.buttonStyle(ShellButtonStyle(prominent: true))
+                }
+                Button(model.text(.log)) { openLog(GameLogs.appLog(documents: model.documents)) }.buttonStyle(ShellButtonStyle())
+                CopyReportButton(error: message, appLog: true)
+                Button(model.text(.close)) { model.importState = .idle }.buttonStyle(ShellButtonStyle())
+            }
+        case .idle, .finished:
+            EmptyView()
+        }
+    }
+}
+
+/// One card of the library's notices: an icon (or the game's), a line, a detail, an optional bar and its buttons.
+struct NoticeCard<Actions: View>: View {
+    var game: InstalledGame?
+    let symbol: String
+    let tint: Color
+    let title: String
+    let detail: String?
+    var progress: Double?
+    @ViewBuilder var actions: Actions
+
+    var body: some View {
+        ShellCard(padding: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 12) {
+                    if let game {
+                        GameIcon(game: game, cornerRadius: 8).frame(width: 38, height: 38)
+                    } else {
+                        // Decoration: the title says what the card is, and VoiceOver would read the symbol's own name.
+                        Image(systemName: symbol).font(.system(size: 17)).foregroundStyle(tint)
+                            .frame(width: 38, height: 38)
+                            .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .accessibilityHidden(true)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title).font(.system(size: 14, weight: .semibold)).foregroundStyle(ShellInk.primary)
+                            .lineLimit(2)
+                        if let detail {
+                            Text(detail).font(.system(size: 12)).foregroundStyle(ShellInk.secondary)
+                                .lineLimit(3).truncationMode(.middle)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                if let progress { ShellBar(fraction: progress) }
+                if Actions.self != EmptyView.self {
+                    // On one line when they fit, else one under the other.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) { actions }
+                        VStack(alignment: .leading, spacing: 8) { actions }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// "Copy the report" under a state that went wrong: the report (`ShellHostModel.report`) goes to the pasteboard, and the
+/// button says so for two seconds.
+struct CopyReportButton: View {
+    @EnvironmentObject private var model: ShellHostModel
+    let error: String
+    var titleID: String?
+    var appLog = false
+    @State private var copied = false
+
+    var body: some View {
+        Button(copied ? model.text(.reportCopied) : model.text(.copyReport)) {
+            UIPasteboard.general.string = model.report(error: error, titleID: titleID, appLog: appLog)
+            copied = true
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                copied = false
+            }
+        }
+        .buttonStyle(ShellButtonStyle())
+    }
+}

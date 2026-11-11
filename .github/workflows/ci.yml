@@ -1,0 +1,70 @@
+# Every push and pull request: the three test suites. Nothing here needs a key, a game or a certificate: the tests
+# build their Mach-O files and packages themselves.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-and-mac:
+    name: core and mac tests
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode
+        run: .github/scripts/select_xcode.sh
+      - name: git reads GitHub with the workflow's token (anonymous clones from runners are refused)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh auth setup-git
+      - name: core
+        run: swift test --package-path core
+      - name: mac
+        run: swift test --package-path mac
+      - name: launcher build and SDK check
+        run: tools/build_mac.sh
+
+  ios:
+    name: iOS tests
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode
+        run: .github/scripts/select_xcode.sh
+      - name: git reads GitHub with the workflow's token (anonymous clones from runners are refused)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh auth setup-git
+      - name: XcodeGen
+        run: brew install xcodegen
+      - name: signing library (zsign and OpenSSL, pinned)
+        run: tools/build_zsign.sh
+      - name: Python 3.14 (the pinned packages have wheels for it)
+        id: python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: fonts (Noto Sans JP, pinned)
+        run: |
+          NXPOCKET_BASE_PYTHON=${{ steps.python.outputs.python-path }} tools/setup_python.sh
+          tools/make_fonts.sh app/Gen/dm/font
+      - name: project
+        run: cd app && xcodegen generate
+      - name: tests
+        run: |
+          DEVICE=$(.github/scripts/pick_simulator.sh)
+          echo "simulator: $DEVICE"
+          xcodebuild test -project app/NXPocket.xcodeproj -scheme NXPocket \
+            -destination "platform=iOS Simulator,id=$DEVICE" -quiet

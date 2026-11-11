@@ -1,0 +1,152 @@
+name: NXPocket
+options:
+  bundleIdPrefix: dev.nxpocket
+  deploymentTarget:
+    iOS: '26.0'
+  createIntermediateGroups: true
+packages:
+  NXShell:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    SWIFT_STRICT_CONCURRENCY: minimal
+    CODE_SIGNING_ALLOWED: NO
+    GENERATE_INFOPLIST_FILE: NO
+    TARGETED_DEVICE_FAMILY: '1'
+    SUPPORTS_MACCATALYST: NO
+    SWIFT_EMIT_LOC_STRINGS: YES
+    # The signing engine is C++ (zsign is), and a Swift app does not link the C++ standard library by itself. Set
+    # for the whole project so the test bundles, which also end up referencing the engine, get it too.
+    OTHER_LDFLAGS: ['$(inherited)', '-lc++']
+targets:
+  NXPocket:
+    type: application
+    platform: iOS
+    settings:
+      base:
+        # Fixed, and never changed for an installation: iOS keys the app's Documents folder to it, so changing it
+        # loses the games. This is the default the launcher sends to.
+        PRODUCT_BUNDLE_IDENTIFIER: dev.nxpocket.app
+        # The icon is drawn by app/Resources/make_icon.swift; actool adds CFBundleIcons to the Info.plist it builds.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # OpenSSL is a dynamic framework, so libnxzsign finds it at @rpath at launch.
+        LD_RUNPATH_SEARCH_PATHS: ['$(inherited)', '@executable_path/Frameworks']
+        # The version script below reads ../VERSION and writes the built Info.plist, outside what a sandboxed script
+        # may touch.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    sources:
+      - Sources/NXShellApp
+      # The app icon and the library's logo. Only the catalog: make_icon.swift beside it is a tool, not app code.
+      - path: Resources/Assets.xcassets
+      # The engine's stand-ins for the console's shared fonts (DM_FONT_DIR, EngineLaunchPlan), copied in by
+      # tools/build_app.sh from the engine's own build: never committed (standard.ttf is macOS's Arial Unicode).
+      - path: Gen/dm
+        type: folder
+        buildPhase: resources
+        optional: true
+    info:
+      path: Gen/Info.plist
+      properties:
+        CFBundleDisplayName: NXPocket
+        CFBundleName: NXPocket
+        # Placeholders: the "Version" script after the build writes ../VERSION and $BUILD_NUMBER over them.
+        CFBundleShortVersionString: '0.0.0'
+        CFBundleVersion: '1'
+        CFBundleLocalizations: [en, fr]
+        LSRequiresIPhoneOS: true
+        MinimumOSVersion: '26.0'
+        UIDeviceFamily: [1]
+        UIRequiredDeviceCapabilities: [arm64]
+        # nxpocket://play/<title ID>: what a game's icon on the home screen opens (a web clip from a profile the app
+        # writes, ShortcutProfile).
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.nxpocket.play
+            CFBundleURLSchemes: [nxpocket]
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        UIApplicationSupportsIndirectInputEvents: true
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        UIUserInterfaceStyle: Dark
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # What the engine's own shell declares for a game (engine dm/ios/project-shell.yml): controllers, the
+        # display's full refresh rate and Game Mode. One scene: the one the game's view takes over.
+        GCSupportsControllerUserInteraction: true
+        GCSupportedGameControllers:
+          - ProfileName: ExtendedGamepad
+        CADisableMinimumFrameDurationOnPhone: true
+        LSSupportsGameMode: true
+        LSApplicationCategoryType: public.app-category.games
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    # One version for the whole repository: the root VERSION file (0.2.0), and the build number CI gives in BUILD_NUMBER
+    # (1 when it is not set). Read at build time, so neither needs xcodegen to run again, and the SideStore source CI
+    # generates from the same file names the same version the app shows.
+    postBuildScripts:
+      - name: Version
+        basedOnDependencyAnalysis: false
+        # The processed Info.plist as an input orders this after Xcode writes it: without it, a build could write
+        # the placeholders over the version afterwards.
+        inputFiles:
+          - $(SRCROOT)/../VERSION
+          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
+        script: |
+          set -eu
+          version=$(tr -d '[:space:]' < "${SRCROOT}/../VERSION" 2>/dev/null || true)
+          build="${BUILD_NUMBER:-1}"
+          case "$version" in ''|*[!0-9.]*) echo "error: ../VERSION must hold a version such as 0.2.0, not '$version'"; exit 1 ;; esac
+          case "$build" in ''|*[!0-9.]*) echo "error: BUILD_NUMBER must be digits and dots, not '$build'"; exit 1 ;; esac
+          plist="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build" "$plist"
+          echo "NXPocket $version ($build)"
+    entitlements:
+      path: Gen/NXPocket.entitlements
+      properties:
+        # A game's framework inherits this app's entitlements: this is what raises the ceiling to several GB.
+        com.apple.developer.kernel.increased-memory-limit: true
+    dependencies:
+      - package: NXShell
+        product: NXShellHost
+      - package: NXShell
+        product: NXShellUI
+      # The signing engine itself comes in through the NXShell package's binary target, because the code that
+      # imports it lives there. Only OpenSSL is the app's own business: it is dynamic, so it has to be embedded.
+      - framework: Signing/OpenSSL.xcframework
+        embed: true
+  NXShellHostTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests/NXShellHostTests
+    dependencies:
+      - package: NXShell
+        product: NXShellHost
+      # Linked, not embedded: the test bundle runs inside the app, which already carries OpenSSL. Without it the
+      # engine's own objects fail to resolve (the first symbol is _i2d_CMS_bio) and the tests stop building.
+      - framework: Signing/OpenSSL.xcframework
+        embed: false
+  NXShellUITests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests/NXShellUITests
+    dependencies:
+      - package: NXShell
+        product: NXShellUI
+schemes:
+  NXPocket:
+    build:
+      targets:
+        NXPocket: all
+    run:
+      config: Debug
+    test:
+      targets:
+        - NXShellHostTests
+        - NXShellUITests
