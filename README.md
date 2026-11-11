@@ -17,7 +17,7 @@ them, without reinstalling the app for each game.
 ## Requirements
 
 - Apple silicon Mac, macOS 13+, full Xcode (the Command Line Tools are not enough).
-- iPhone on iOS 26+, with [SideStore](https://sidestore.io).
+- iPhone 15 Pro or newer, on iOS 26+, with [SideStore](https://sidestore.io).
 - Your own dumps and your own `prod.keys`.
 
 ## Install
