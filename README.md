@@ -6,6 +6,16 @@ them, without reinstalling the app for each game.
 > No keys, no firmware, no games included. Not an emulator: the game's code runs natively and Metal draws it.
 > Not affiliated with Nintendo.
 
+<p align="center">
+  <img src="docs/images/iphone-library.png" width="200" alt="Library">
+  <img src="docs/images/iphone-menu.png" width="200" alt="Game menu">
+  <img src="docs/images/iphone-game.png" width="200" alt="Game sheet">
+  <img src="docs/images/iphone-settings.png" width="200" alt="Settings">
+</p>
+<p align="center">
+  <img src="docs/images/iphone-controls.png" width="620" alt="Touch controls editor">
+</p>
+
 ## How it works
 
 | | |

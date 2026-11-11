@@ -110,7 +110,7 @@ public final class SettingsStore: ObservableObject {
 
     /// The domain the launcher kept its settings in while it ran as a plain executable (`swift build`): a bundle's
     /// standard defaults are its bundle ID's, so the .app would otherwise start from nothing (no keys, folders, device).
-    static let plainExecutableDomain = "iPorterNX"
+    static let plainExecutableDomain = "NXPocket"
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
