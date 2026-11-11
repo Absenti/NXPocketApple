@@ -54,22 +54,23 @@ jobs:
         run: |
           tools/build_mac.sh --app
           mkdir -p "$NXPOCKET_OUTPUT"
-          ditto -c -k --keepParent mac/.build/iPorterNX.app "$NXPOCKET_OUTPUT/iPorterNX-Launcher.zip"
+          ditto -c -k --keepParent mac/.build/iPorterNX.app "$NXPOCKET_OUTPUT/iPorterNX-macOS.zip"
       - name: iPhone app
         run: |
           tools/build_zsign.sh
           tools/build_app.sh --device-unsigned
+          mv "$NXPOCKET_OUTPUT/iPorterNX.ipa" "$NXPOCKET_OUTPUT/iPorterNX-iPhone.ipa"
       - name: SideStore source and checksums
         run: |
           cd "$NXPOCKET_OUTPUT"
-          python3 "$GITHUB_WORKSPACE/tools/make_source.py" iPorterNX.ipa "$VERSION" "$BUILD_NUMBER" \
-            "https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/iPorterNX.ipa" source.json
-          shasum -a 256 iPorterNX-Launcher.zip iPorterNX.ipa source.json > SHA256SUMS
+          python3 "$GITHUB_WORKSPACE/tools/make_source.py" iPorterNX-iPhone.ipa "$VERSION" "$BUILD_NUMBER" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/iPorterNX-iPhone.ipa" source.json
+          shasum -a 256 iPorterNX-macOS.zip iPorterNX-iPhone.ipa source.json > SHA256SUMS
           cat SHA256SUMS
       - name: publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd "$NXPOCKET_OUTPUT"
-          gh release create "$TAG" iPorterNX-Launcher.zip iPorterNX.ipa source.json SHA256SUMS \
-            --repo "$GITHUB_REPOSITORY" --title "iPorterNX $VERSION" --generate-notes --verify-tag
+          gh release create "$TAG" iPorterNX-macOS.zip iPorterNX-iPhone.ipa source.json SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --title "iPorterNX $VERSION · macOS + iPhone" --generate-notes --verify-tag

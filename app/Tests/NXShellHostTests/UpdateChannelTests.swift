@@ -10,9 +10,9 @@ final class UpdateChannelTests: XCTestCase {
       {"name": "iPorterNX", "bundleIdentifier": "dev.nxpocket.app", "developerName": "iPorterNX",
        "versions": [
          {"version": "0.2.0", "buildVersion": "7", "date": "2026-11-11T20:00:00Z", "size": 20000000,
-          "downloadURL": "https://github.com/Absenti/iPorterNX/releases/download/v0.2.0/iPorterNX.ipa"},
+          "downloadURL": "https://github.com/Absenti/iPorterNX/releases/download/v0.2.0/iPorterNX-iPhone.ipa"},
          {"version": "0.10.0", "buildVersion": "12", "date": "2026-12-01", "size": 21000000,
-          "downloadURL": "https://github.com/Absenti/iPorterNX/releases/download/v0.10.0/iPorterNX.ipa"},
+          "downloadURL": "https://github.com/Absenti/iPorterNX/releases/download/v0.10.0/iPorterNX-iPhone.ipa"},
          {"version": "not a version"}
        ]}
     ]}
@@ -23,14 +23,14 @@ final class UpdateChannelTests: XCTestCase {
         XCTAssertEqual(release.version, "0.10.0", "0.10.0 is newer than 0.2.0: versions compare as numbers")
         XCTAssertEqual(release.build, "12")
         XCTAssertEqual(release.size, 21_000_000)
-        XCTAssertEqual(release.downloadURL?.lastPathComponent, "iPorterNX.ipa")
+        XCTAssertEqual(release.downloadURL?.lastPathComponent, "iPorterNX-iPhone.ipa")
         XCTAssertNotNil(release.date, "a date alone, without a time, reads too")
     }
 
     func testAnOlderSourceWithTheVersionOnTheAppReads() throws {
         let legacy = Data("""
         {"apps": [{"bundleIdentifier": "dev.nxpocket.app", "version": "0.3.1", "versionDate": "2026-12-24",
-                   "downloadURL": "https://example.invalid/iPorterNX.ipa", "size": 5}]}
+                   "downloadURL": "https://example.invalid/iPorterNX-iPhone.ipa", "size": 5}]}
         """.utf8)
         XCTAssertEqual(UpdateChannel.newestRelease(in: legacy)?.version, "0.3.1")
         XCTAssertNil(UpdateChannel.newestRelease(in: Data(#"{"apps": []}"#.utf8)))

@@ -50,9 +50,9 @@ final class LauncherUpdateTests: XCTestCase {
             "tag_name": tag, "name": "iPorterNX 0.3.0", "body": "- Saves are copied by themselves\n- Setup screen",
             "html_url": "https://github.com/Absenti/iPorterNX/releases/tag/\(tag)", "draft": draft, "prerelease": prerelease,
             "assets": [
-                ["name": "iPorterNX-Launcher.zip", "browser_download_url": "https://github.com/Absenti/iPorterNX/releases/download/\(tag)/iPorterNX-Launcher.zip"],
+                ["name": "iPorterNX-macOS.zip", "browser_download_url": "https://github.com/Absenti/iPorterNX/releases/download/\(tag)/iPorterNX-macOS.zip"],
                 ["name": "SHA256SUMS", "browser_download_url": "https://github.com/Absenti/iPorterNX/releases/download/\(tag)/SHA256SUMS"],
-                ["name": "iPorterNX.ipa", "browser_download_url": "http://example.com/iPorterNX.ipa"],
+                ["name": "iPorterNX-iPhone.ipa", "browser_download_url": "http://example.com/iPorterNX-iPhone.ipa"],
                 ["name": "broken"],
             ],
         ]
@@ -66,7 +66,7 @@ final class LauncherUpdateTests: XCTestCase {
         XCTAssertEqual(release.title, "iPorterNX 0.3.0")
         XCTAssertTrue(release.notes.contains("Setup screen"))
         XCTAssertEqual(release.page.absoluteString, "https://github.com/Absenti/iPorterNX/releases/tag/v0.3.0")
-        XCTAssertEqual(Set(release.assets.keys), ["iPorterNX-Launcher.zip", "SHA256SUMS"], "a plain-http asset is not taken")
+        XCTAssertEqual(Set(release.assets.keys), ["iPorterNX-macOS.zip", "SHA256SUMS"], "a plain-http asset is not taken")
     }
 
     func testAReleaseWhoseTagIsNotAVersionOrThatIsNotJSONIsRefused() {
@@ -111,15 +111,15 @@ final class LauncherUpdateTests: XCTestCase {
     func testShasumLinesAreReadInTextAndBinaryMode() {
         let zip = String(repeating: "a", count: 64), ipa = String(repeating: "B", count: 64)
         let text = """
-            \(zip)  iPorterNX-Launcher.zip
-            \(ipa) *iPorterNX.ipa
+            \(zip)  iPorterNX-macOS.zip
+            \(ipa) *iPorterNX-iPhone.ipa
             not a line
             1234  short.txt
 
             """
         let sums = LauncherUpdate.checksums(in: text)
-        XCTAssertEqual(sums["iPorterNX-Launcher.zip"], zip)
-        XCTAssertEqual(sums["iPorterNX.ipa"], ipa.lowercased())
+        XCTAssertEqual(sums["iPorterNX-macOS.zip"], zip)
+        XCTAssertEqual(sums["iPorterNX-iPhone.ipa"], ipa.lowercased())
         XCTAssertEqual(sums.count, 2)
     }
 
@@ -184,7 +184,7 @@ final class LauncherUpdateTests: XCTestCase {
     }
 
     /// The whole download path against a local server holding a real `--app` build zipped as a release is:
-    /// NXPOCKET_UPDATE_LIVE=http://127.0.0.1:<port> with iPorterNX-Launcher.zip, SHA256SUMS and BAD_SUMS (wrong hash).
+    /// NXPOCKET_UPDATE_LIVE=http://127.0.0.1:<port> with iPorterNX-macOS.zip, SHA256SUMS and BAD_SUMS (wrong hash).
     func testLivePrepareFromALocalServer() throws {
         guard let base = ProcessInfo.processInfo.environment["NXPOCKET_UPDATE_LIVE"].flatMap(URL.init(string:)) else {
             throw XCTSkip("set NXPOCKET_UPDATE_LIVE to a local server holding a release's files")

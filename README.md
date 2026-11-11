@@ -22,8 +22,8 @@ them, without reinstalling the app for each game.
 
 ## Install
 
-1. **Mac:** download `iPorterNX-Launcher.zip` from the [latest release](https://github.com/Absenti/iPorterNX/releases/latest),
-   move `iPorterNX.app` to Applications, and open it with right-click → Open the first time. Its **Setup** screen
+1. **Mac:** download `iPorterNX-macOS.zip` from the [latest release](https://github.com/Absenti/iPorterNX/releases/latest),
+   move `iPorterNX.app` to Applications, and clear the download quarantine once (see below). Its **Setup** screen
    installs the rest (Python, XcodeGen, the engine), every download pinned and checked. No Homebrew, no admin password.
 2. **iPhone:** in SideStore, add this source and install iPorterNX from it:
    `https://github.com/Absenti/iPorterNX/releases/latest/download/source.json`
@@ -31,6 +31,18 @@ them, without reinstalling the app for each game.
 4. In the launcher, pick your games folder and `prod.keys`, build, and send.
 
 Never install the IPA by opening it from Files: iOS installs a second copy that will not start.
+
+### "Apple could not verify iPorterNX is free of malware"
+
+The launcher is signed ad hoc, not notarized by Apple (that needs a paid Developer ID), so macOS blocks it the first
+time. Either run, once:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/iPorterNX.app
+```
+
+or open it, then **System Settings → Privacy & Security → Open Anyway**. Updates installed by the launcher itself are
+not quarantined and open without this step.
 
 ## Updates
 

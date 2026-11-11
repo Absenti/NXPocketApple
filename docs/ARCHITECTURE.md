@@ -32,8 +32,14 @@ Pure Foundation, no UI, no platform assumptions. Both apps link it, so the two s
 
 ## `mac/` — the launcher
 
-`NXPMacKit` (no SwiftUI) then `NXPMacModel` (the stores) then the `iPorterNX` executable (the views). Each layer may
+`NXPMacKit` (no SwiftUI) then `NXPMacModel` (the stores) then the `NXPocket` executable (the views). Each layer may
 only use the one above it.
+
+`tools/build_mac.sh --app` wraps the executable in `iPorterNX.app` (bundle ID `dev.nxpocket.launcher`), signed ad hoc.
+It is not notarized, which needs a paid Developer ID: Gatekeeper blocks the copy downloaded from a release until the
+quarantine attribute is removed (`xattr -dr com.apple.quarantine /Applications/iPorterNX.app`) or the user picks
+**Open Anyway** in System Settings → Privacy & Security. `LauncherUpdate` downloads with URLSession, which sets no
+quarantine, so an update replaces the app without asking again.
 
 - `Toolchain` — finds Xcode, a Python new enough for the engine, and the engine tree.
 - `EngineBuilder` — the argument list, the JSON event stream, and what the engine left behind.

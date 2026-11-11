@@ -82,7 +82,7 @@ public enum LauncherUpdate {
     public static let releasesPage = URL(string: "https://github.com/\(repository)/releases")!
     public static let userAgent = "iPorterNX-Launcher"
     public static let bundleID = "dev.nxpocket.launcher"
-    public static let zipName = "iPorterNX-Launcher.zip"
+    public static let zipName = "iPorterNX-macOS.zip"
     public static let sumsName = "SHA256SUMS"
 
     /// The running launcher's version, nil for a build that is not a bundle (the plain `swift build` executable).
