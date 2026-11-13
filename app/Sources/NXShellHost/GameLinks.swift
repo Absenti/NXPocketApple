@@ -81,15 +81,15 @@ public enum ShortcutProfile {
         let id = titleID.description
         var clip: [String: Any] = [
             "PayloadType": "com.apple.webClip.managed", "PayloadVersion": 1,
-            "PayloadIdentifier": "dev.nxpocket.shortcut.\(id).webclip", "PayloadUUID": uuid("webclip.\(id)"),
+            "PayloadIdentifier": "dev.nxpocketapple.shortcut.\(id).webclip", "PayloadUUID": uuid("webclip.\(id)"),
             "PayloadDisplayName": texts.label, "Label": texts.label, "URL": GameLink.url(for: titleID).absoluteString,
             "IsRemovable": true, "FullScreen": false, "Precomposed": true,
         ]
         if let icon { clip["Icon"] = icon }
         let profile: [String: Any] = [
             "PayloadType": "Configuration", "PayloadVersion": 1,
-            "PayloadIdentifier": "dev.nxpocket.shortcut.\(id)", "PayloadUUID": uuid("profile.\(id)"),
-            "PayloadDisplayName": texts.displayName, "PayloadOrganization": "iPorterNX",
+            "PayloadIdentifier": "dev.nxpocketapple.shortcut.\(id)", "PayloadUUID": uuid("profile.\(id)"),
+            "PayloadDisplayName": texts.displayName, "PayloadOrganization": "NXPocketApple",
             "PayloadDescription": texts.description, "PayloadRemovalDisallowed": false,
             "PayloadContent": [clip],
         ]

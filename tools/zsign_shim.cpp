@@ -25,6 +25,7 @@
 #include "macho.h"
 #include "openssl.h"
 
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pkcs12.h>
 #include <openssl/provider.h>
@@ -232,17 +233,19 @@ int nxpocket_zsign_sign(const char *p12Path, const char *passphrase,
     // SHA-256 directory in slot 0.
     //
     // entitlementsPath decides what the framework's signature carries: a file replaces the profile's Entitlements
-    // dict (an empty dict for none), and no file keeps the profile's, which is what iOS wants outside the bundle.
+    // dict (the app's own signed entitlements, or an empty dict for none), and no file keeps the profile's.
     if (!asset.Init("", p12Path, provisionPath, present(entitlementsPath) ? entitlementsPath : "",
                     passphrase ? passphrase : "",
                     /* bAdhoc */ false, /* bSHA256Only */ true, /* bSingleBinary */ false)) {
         fail(error, errorLength, "zsign refused the certificate or the provisioning profile");
         return 1;
     }
-    // No entitlements file means the caller asked for the profile's own (probe 5C, DeviceSigner's .appProfile).
-    // Stock zsign would still write an empty dict into a dylib, so the request needs the patched flag to mean
-    // anything: patches/zsign/0001-dylib-entitlements.patch. With a file, a dylib keeps zsign's own behaviour.
-    asset.m_bDylibEntitlements = !present(entitlementsPath);
+    // Whatever the entitlements are, profile's or file's, they are written into the dylib: stock zsign would put an
+    // empty dict there for anything that is not an executable, whatever it was handed, so the request needs the
+    // patched flag to mean anything (patches/zsign/0001-dylib-entitlements.patch). It used to be on only for the
+    // profile's; with a file it is on too, since a file is how the app's own signed entitlements reach the dylib
+    // (DeviceSigner.Entitlements.appSigned).
+    asset.m_bDylibEntitlements = true;
 
     const std::string framework(frameworkPath);
     const std::string binary = framework + "/" + executableName;
@@ -301,16 +304,21 @@ int nxpocket_p12_certificate(const unsigned char *p12Bytes, int p12Length, const
     const unsigned char *cursor = p12Bytes;
     PKCS12 *p12 = d2i_PKCS12(NULL, &cursor, p12Length);
     if (!p12) {
+        ERR_clear_error();
         fail(error, errorLength, "this file is not a .p12 the signer can decode");
         return NXPOCKET_P12_UNREADABLE;
     }
     const char *password = passphrase ? passphrase : "";
+    // OpenSSL queues every error it raises on the thread and never drops them by itself: the next call's diagnosis
+    // would otherwise inherit the last .p12's failure. Cleared before and after, whatever the outcome.
+    ERR_clear_error();
     // The MAC is checked only when there is one, as PKCS12_parse does. SideStore's export carries none: checking it
     // regardless called every password wrong, and it is also what made iOS's SecPKCS12Import answer errSecDecode.
     // An export with no password may have been made with an empty one or with none at all; try both.
     const bool hasMAC = PKCS12_mac_present(p12);
     if (hasMAC && !PKCS12_verify_mac(p12, password, -1) && !(*password == 0 && PKCS12_verify_mac(p12, NULL, 0))) {
         PKCS12_free(p12);
+        ERR_clear_error();
         fail(error, errorLength, "that password does not open this .p12");
         return NXPOCKET_P12_WRONG_PASSWORD;
     }
@@ -320,6 +328,7 @@ int nxpocket_p12_certificate(const unsigned char *p12Bytes, int p12Length, const
     int parsed = PKCS12_parse(p12, password, &key, &certificate, &chain);
     PKCS12_free(p12);
     if (!parsed) {
+        ERR_clear_error();
         // Without a MAC nothing tells a wrong password from a damaged file but the decryption failing; the password
         // is by far the likelier of the two.
         if (!hasMAC) {

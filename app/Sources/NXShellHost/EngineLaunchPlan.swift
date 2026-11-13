@@ -106,7 +106,7 @@ public struct EngineLaunchPlan: Sendable {
         }
         var result: [(key: String, value: LockedValue)] = []
         var seen = Set<String>()
-        for key in launchEnvironment.keys.sorted() where key.hasPrefix("DM_") && seen.insert(key).inserted {
+        for key in launchEnvironment.keys.sorted() where isEngineVariable(key) && seen.insert(key).inserted {
             result.append((key, LockedValue(launchEnvironment[key] ?? "", .launch)))
         }
         var files: [(name: String, text: String?)] = [
@@ -119,11 +119,24 @@ public struct EngineLaunchPlan: Sendable {
         // Only the engine's own variables: an env file in a package or in Files must not set HOME, TMPDIR, DYLD_* or
         // MTL_* for the whole process.
         for file in files {
-            for (key, value) in parseEnvFile(file.text ?? "") where key.hasPrefix("DM_") && seen.insert(key).inserted {
+            for (key, value) in parseEnvFile(file.text ?? "") where isEngineVariable(key) && isEngineValue(value) && seen.insert(key).inserted {
                 result.append((key, LockedValue(value, .envFile(file.name))))
             }
         }
         return result
+    }
+
+    /// `DM_` and then capitals, digits and underscores. A key with a space in it would split in two inside
+    /// `DM_ENV_FILE_KEYS`, a space-separated list, and name a variable nobody wrote; anything else is no engine variable.
+    public static func isEngineVariable(_ key: String) -> Bool {
+        key.hasPrefix("DM_") && key.utf8.count > 3
+            && key.utf8.allSatisfy { ($0 >= 65 && $0 <= 90) || ($0 >= 48 && $0 <= 57) || $0 == 95 }
+    }
+
+    /// A value is one line of printable text: no control character (a NUL would end it early in C, a CR or LF would
+    /// start another assignment for whatever reads the environment line by line).
+    public static func isEngineValue(_ value: String) -> Bool {
+        value.unicodeScalars.allSatisfy { $0.value >= 0x20 && $0.value != 0x7F }
     }
 
     /// `KEY=VALUE` lines in order: `#` starts a comment, a blank line or one without `=` is skipped.

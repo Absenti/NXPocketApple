@@ -23,7 +23,7 @@ public struct PhoneAppIPA: Equatable, Sendable {
 
 /// Finds the repository the launcher runs from, reads the IPA, and builds it with the repository's own script.
 public enum PhoneAppBuild {
-    public static let ipaName = "iPorterNX.ipa"
+    public static let ipaName = "NXPocketApple.ipa"
 
     /// The repository holding the launcher that runs: `mac/.build/release/NXPocket` sits three folders below it.
     /// A launcher copied elsewhere has none, and cannot build the app.

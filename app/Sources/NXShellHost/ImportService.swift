@@ -98,9 +98,9 @@ public final class ImportService: @unchecked Sendable {
         }
         let record = SigningRecord(certificateSHA256: identity.certificateSHA256, identifier: identity.identifier,
                                    teamID: identity.teamID, subject: identity.subject,
-                                   signedAt: Date(), expires: identity.expires)
+                                   signedAt: Date(), expires: identity.expires, entitlements: identity.entitlementsTag)
         try GameLibrary.writeSigning(record, in: game.directory, fileManager: fileManager)
-        log?.append("signed \(game.titleID) again for \(identity.teamID)")
+        log?.append("signed \(game.titleID) again for \(identity.teamID), with the \(identity.entitlementsTag ?? SigningRecord.defaultEntitlementsTag) entitlements")
         return record
     }
 
@@ -124,13 +124,13 @@ public final class ImportService: @unchecked Sendable {
 
 /// Removes a game's files, keeping its saves unless asked otherwise.
 public enum GameRemoval {
-    /// With `saves` false, everything but the `save*` entries goes from the game's folder, in place: the saves are never
-    /// moved, so an interruption cannot leave them in a folder nothing looks at.
-    public static func remove(_ game: InstalledGame, saves: Bool, fileManager: FileManager = .default) throws {
+    /// Without `includingSaves`, everything but the `save*` entries goes from the game's folder, in place: the saves are
+    /// never moved, so an interruption cannot leave them in a folder nothing looks at.
+    public static func remove(_ game: InstalledGame, includingSaves: Bool, fileManager: FileManager = .default) throws {
         let directory = game.directory
         guard fileManager.fileExists(atPath: directory.path) else { return }
         let names = try fileManager.contentsOfDirectory(atPath: directory.path)
-        guard !saves, names.contains(where: { $0.hasPrefix("save") }) else {
+        guard !includingSaves, names.contains(where: { $0.hasPrefix("save") }) else {
             try fileManager.removeItem(at: directory)
             return
         }

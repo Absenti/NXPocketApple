@@ -76,3 +76,78 @@ struct GameIcon: View {
             .accessibilityHidden(true)
     }
 }
+
+
+/// The colours a game lends its screen, taken from its picture: a glow for the background and a fill for the main
+/// button. Soft on purpose: the picture's own colour, never a flat neon. The Mac launcher does the same for the
+/// game it has selected.
+struct GameTheme {
+    var glow: Color
+    var fill: Color
+    /// The light pastel of the main pill under the covers.
+    var bright: Color
+
+    static let standard = GameTheme(glow: ShellInk.accent, fill: ShellInk.deep, bright: Color(red: 0.96, green: 0.76, blue: 0.47))
+
+    init(glow: Color, fill: Color, bright: Color) {
+        self.glow = glow
+        self.fill = fill
+        self.bright = bright
+    }
+
+    init(hue: Double, saturation: Double) {
+        let s = min(max(saturation, 0.35), 0.75)
+        glow = Color(hue: hue, saturation: s, brightness: 0.85)
+        fill = Color(hue: hue, saturation: min(s, 0.6) * 0.9, brightness: 0.80)
+        bright = Color(hue: hue, saturation: min(s, 0.55) * 0.85, brightness: 0.98)
+    }
+}
+
+enum ArtTheme {
+    private static var cache: [String: GameTheme] = [:]
+
+    /// The theme of a game's picture: the hue most of its colour sits in, weighted by how vivid it is. A picture with no
+    /// colour of its own (grey, black and white) or none at all keeps the standard amber. Read once per picture.
+    @MainActor
+    static func theme(for game: InstalledGame) -> GameTheme {
+        // The key reads nothing from disk: this runs on every render of the game's screen. A game that is updated
+        // changes its version or size, which is when its picture may have changed too.
+        let key = "\(game.id)#\(game.version)#\(game.byteCount)"
+        if let known = cache[key] { return known }
+        let result = GameArtwork.icon(for: game)?.cgImage.flatMap(compute) ?? .standard
+        cache[key] = result
+        return result
+    }
+
+    private static func compute(_ cg: CGImage) -> GameTheme? {
+        let side = 24
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8,
+                                          bytesPerRow: side * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.interpolationQuality = .medium
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        guard drawn else { return nil }
+        var x = 0.0, y = 0.0, weight = 0.0, saturationSum = 0.0
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            let alpha = Double(pixels[index + 3]) / 255
+            guard alpha > 0.5 else { continue }
+            let color = UIColor(red: Double(pixels[index]) / 255 / alpha, green: Double(pixels[index + 1]) / 255 / alpha,
+                                blue: Double(pixels[index + 2]) / 255 / alpha, alpha: 1)
+            var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            guard color.getHue(&h, saturation: &s, brightness: &b, alpha: &a), b > 0.18, s > 0.2 else { continue }
+            let w = Double(s * b)
+            x += cos(Double(h) * 2 * .pi) * w
+            y += sin(Double(h) * 2 * .pi) * w
+            saturationSum += Double(s) * w
+            weight += w
+        }
+        guard weight > 3 else { return nil }
+        var hue = atan2(y, x) / (2 * .pi)
+        if hue < 0 { hue += 1 }
+        return GameTheme(hue: hue, saturation: saturationSum / weight)
+    }
+}

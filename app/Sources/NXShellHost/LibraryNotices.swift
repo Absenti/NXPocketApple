@@ -10,20 +10,23 @@ struct LibraryNotices: View {
     let openSettings: () -> Void
     /// A log to open, or nil for the list.
     let openLog: (LogFile?) -> Void
+    /// The covers screen has no room for the two big cards (import the certificate, sign the games again): its header has
+    /// a pill for each instead, and this leaves them out.
+    var compact = false
 
     var body: some View {
         VStack(spacing: 10) {
             launchCard
             failedLaunch
             UpdateNotice(updates: model.updates)
-            ForEach(model.receiving) { receivingCard($0) }
-            importCard
-            if model.certificate == nil {
+            ForEach(model.receiving) { ReceivingTransferCard(transfer: $0) }
+            ImportStateCard(openLog: openLog)
+            if model.certificate == nil, !compact {
                 NoticeCard(symbol: "key.fill", tint: ShellInk.accent, title: model.text(.certificateNeededTitle),
                            detail: model.text(model.pendingTransfers > 0 ? .gameWaitsForCertificate : .certificateNeededBody)) {
                     Button(model.text(.settings), action: openSettings).buttonStyle(ShellButtonStyle(prominent: true))
                 }
-            } else if !model.importState.isRunning, toSign > 0 {
+            } else if !model.importState.isRunning, toSign > 0, !compact {
                 NoticeCard(symbol: "signature", tint: ShellInk.accent,
                            title: "\(ShellStrings.gameCount(toSign, language: model.language)) \(model.text(.toSignAgain))",
                            detail: model.text(.signAgainBody)) {
@@ -67,19 +70,31 @@ struct LibraryNotices: View {
             EmptyView()
         }
     }
+}
 
-    private func receivingCard(_ transfer: IncomingTransfer) -> some View {
+/// A game on its way from the Mac: its name, how much has landed, and a bar.
+struct ReceivingTransferCard: View {
+    @EnvironmentObject private var model: ShellHostModel
+    let transfer: IncomingTransfer
+
+    var body: some View {
         let received = ByteCountFormatter.string(fromByteCount: transfer.received, countStyle: .file)
         let detail = transfer.expected.map {
             "\(received) \(model.text(.sizeOf)) \(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file))"
         } ?? "\(received) \(model.text(.received))"
-        return NoticeCard(symbol: "arrow.down.circle.fill", tint: ShellInk.accent,
-                          title: "\(model.text(.receiving)) · \(transfer.title ?? model.text(.aGame))", detail: detail,
-                          progress: transfer.fraction ?? 0) { EmptyView() }
+        NoticeCard(symbol: "arrow.down.circle.fill", tint: ShellInk.accent,
+                   title: "\(model.text(.receiving)) · \(transfer.title ?? model.text(.aGame))", detail: detail,
+                   progress: transfer.fraction ?? 0) { EmptyView() }
     }
+}
 
-    @ViewBuilder
-    private var importCard: some View {
+/// An import under way, or the one that failed and what to do about it.
+struct ImportStateCard: View {
+    @EnvironmentObject private var model: ShellHostModel
+    /// A log to open, or nil for the list.
+    let openLog: (LogFile?) -> Void
+
+    var body: some View {
         switch model.importState {
         case .running(let stage, let fraction, let detail):
             NoticeCard(symbol: "square.and.arrow.down.fill", tint: ShellInk.accent, title: model.text(.importing),

@@ -38,9 +38,71 @@ extension AppModel {
 
     public var appBuildBlockers: [String] {
         guard let repository else {
-            return ["This launcher does not run from the iPorterNX repository (mac/.build/release/NXPocket), so it cannot build the app."]
+            return ["This launcher does not run from the NXPocketApple repository (mac/.build/release/NXPocket), so it cannot build the app."]
         }
         return PhoneAppBuild.missing(in: repository, xcode: toolchain.xcode)
+    }
+
+    // MARK: - The IPA from the release
+
+    /// Puts the IPA that came inside the launcher in the output folder when there is none there or only an older one: the
+    /// iPhone app is available at once, before any release is downloaded.
+    func seedPhoneAppFromBundle() {
+        guard let bundled = PhoneAppDownload.bundledIPA() else { return }
+        let destination = ipaURL
+        Task {
+            let seeded = await Task.detached(priority: .utility) { PhoneAppDownload.seed(from: bundled, to: destination) }.value
+            if let seeded { append("iphone app: \(seeded.versionText) taken from this launcher") }
+            refreshPhoneApp()
+        }
+    }
+
+    /// Keeps the iPhone app's IPA here in step with the latest release: fetched when there is none or a newer one is out.
+    /// Runs after each look at GitHub (at launch, once a day), so the app is there without being asked for.
+    func fetchPhoneAppIfNeeded() {
+        guard let release = latestRelease, !ipaDownload.isRunning, PhoneAppDownload.hasIPA(release) else { return }
+        let ipa = ipaURL
+        Task {
+            // Reading the IPA's version runs `unzip`: not on the main thread.
+            let have = await Task.detached(priority: .utility) { PhoneAppBuild.inspect(ipa) }.value
+            if PhoneAppDownload.needsDownload(have: have, release: release) { downloadPhoneApp(release) }
+        }
+    }
+
+    /// Downloads the release's IPA into the output folder, checks it, and replaces the copy kept there.
+    public func downloadPhoneApp(_ release: LauncherRelease) {
+        guard !ipaDownload.isRunning else { return }
+        ipaDownload = .running(fraction: 0, detail: "Downloading NXPocketApple \(release.version)")
+        append("iphone app: downloading \(release.version)")
+        let destination = ipaURL
+        let (events, sink) = AsyncStream.makeStream(of: Double?.self)
+        Task {
+            let reader = Task { @MainActor in
+                for await fraction in events {
+                    ipaDownload = .running(fraction: fraction, detail: "Downloading NXPocketApple \(release.version)")
+                }
+            }
+            let outcome = await Task.detached(priority: .utility) { () -> Result<PhoneAppIPA, Error> in
+                Result {
+                    try PhoneAppDownload.fetch(release, to: destination) { written, expected in
+                        sink.yield(expected > 0 ? Double(written) / Double(expected) : nil)
+                    }
+                }
+            }.value
+            sink.finish()
+            await reader.value
+            switch outcome {
+            case .success(let found):
+                phoneIPA = found
+                ipaDownload = .finished("Version \(found.versionText) is here, checked against the release.")
+                append("iphone app: \(found.versionText) downloaded and checked")
+                refreshPhoneApp()
+            case .failure(let error):
+                let reason = (error as? NXPocketError)?.detail ?? error.localizedDescription
+                ipaDownload = .failed("The iPhone app was not downloaded: \(reason)")
+                append("iphone app: \(reason)")
+            }
+        }
     }
 
     public func refreshPhoneApp() {
@@ -57,11 +119,11 @@ extension AppModel {
 
     // MARK: - Building the IPA
 
-    /// Runs `tools/build_app.sh --device-unsigned`, which writes `iPorterNX.ipa` into the output folder.
+    /// Runs `tools/build_app.sh --device-unsigned`, which writes `NXPocketApple.ipa` into the output folder.
     public func buildPhoneApp() {
         guard !appBuild.isRunning else { return }
         guard let repository else {
-            appBuild = .failed(appBuildBlockers.first ?? "The iPorterNX repository was not found.")
+            appBuild = .failed(appBuildBlockers.first ?? "The NXPocketApple repository was not found.")
             return
         }
         let missing = PhoneAppBuild.missing(in: repository, xcode: toolchain.xcode)
@@ -118,7 +180,7 @@ extension AppModel {
         guard let ipa = phoneIPA else { return }
         let panel = NSSavePanel()
         panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-        panel.nameFieldStringValue = "iPorterNX-\(ipa.version ?? "app")\(ipa.build.map { "-\($0)" } ?? "").ipa"
+        panel.nameFieldStringValue = "NXPocketApple-\(ipa.version ?? "app")\(ipa.build.map { "-\($0)" } ?? "").ipa"
         panel.allowedContentTypes = []
         guard panel.runModal() == .OK, let destination = panel.url else { return }
         do {
@@ -175,7 +237,7 @@ extension AppModel {
                 self.cloudCopy = .failed("The copy to iCloud Drive failed: \(error.localizedDescription)")
                 return
             }
-            self.append("app: iPorterNX.ipa copied to iCloud Drive → Downloads")
+            self.append("app: NXPocketApple.ipa copied to iCloud Drive → Downloads")
             self.watchCloudCopy()
         }
     }
@@ -210,30 +272,28 @@ extension AppModel {
 
     // MARK: - Increased Memory Limit
 
-    /// Reads the bundle ID SideStore installed iPorterNX under on the selected iPhone; the team is its suffix.
-    public func findMemoryTarget() {
+    /// Reads the bundle ID NXPocketApple is installed under on the selected iPhone. A team after it (SideStore,
+    /// AltStore) is the user's own App ID, which the RAM helper can change; the plain ID (FlareStore, Sideloadly,
+    /// Xcode, TrollStore...) is an installation like any other, only the helper does not apply to it.
+    public func findInstallation() {
         guard let device = selectedDevice else {
-            memoryTarget = .failure(NXPocketError(.deviceUnavailable, "Connect the iPhone: the App ID is read from it."))
+            installation = .failure(NXPocketError(.deviceUnavailable, "Connect the iPhone: the app is looked for on it."))
             return
         }
         let toolchain = toolchain
         let base = settings.value.bundleID.isEmpty ? LauncherSettings.defaultBundleID : settings.value.bundleID
         Task {
-            let found = await Task.detached(priority: .userInitiated) { () -> Result<MemoryLimitHelper.Target, NXPocketError> in
+            let found = await Task.detached(priority: .userInitiated) { () -> Result<MemoryLimitHelper.Installation, NXPocketError> in
                 do {
                     let installed = try DeviceTransfer(toolchain: toolchain).installedBundleID(on: device, matching: base)
-                    guard let target = MemoryLimitHelper.target(installed: installed, base: base) else {
-                        return .failure(NXPocketError(.packageUnsupported,
-                                                      "iPorterNX is installed as \(installed), with no team after it: it was not installed by SideStore."))
-                    }
-                    return .success(target)
+                    return .success(MemoryLimitHelper.installation(installed: installed, base: base))
                 } catch let error as NXPocketError {
                     return .failure(error)
                 } catch {
                     return .failure(NXPocketError(.deviceUnavailable, error.localizedDescription))
                 }
             }.value
-            self.memoryTarget = found
+            self.installation = found
         }
     }
 

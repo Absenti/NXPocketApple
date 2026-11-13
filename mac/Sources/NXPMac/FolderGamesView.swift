@@ -8,54 +8,41 @@ struct FolderGamesView: View {
     @State private var expanded: Set<String> = []
 
     var body: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    SectionHeading(text: model.folder.games.isEmpty ? "Games" : "Games · \(model.folder.games.count)")
-                    if model.scanningFolder {
-                        ProgressView().controlSize(.small)
-                        Text("Reading the folder…").font(.system(size: 11)).foregroundStyle(Ink.secondary)
-                    }
-                    Spacer()
-                    if model.folder.games.count > 1 {
-                        Button(model.checkedGames.isEmpty ? "Tick all" : "Untick all") {
-                            model.checkAll(model.checkedGames.isEmpty)
-                        }
-                        .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Ink.accent)
-                    }
-                    Button("Rescan") { model.refreshFolder() }
-                        .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Ink.accent)
-                        .disabled(model.scanningFolder)
+        SettingsGroup(title: model.folder.games.isEmpty ? "Games" : "Games · \(model.folder.games.count)") {
+            if model.scanningFolder { ProgressView().controlSize(.small) }
+            if model.folder.games.count > 1 {
+                Button(model.checkedGames.isEmpty ? "Tick all" : "Untick all") { model.checkAll(model.checkedGames.isEmpty) }
+                    .buttonStyle(QuietButtonStyle())
+            }
+            Button("Rescan") { model.refreshFolder() }.buttonStyle(QuietButtonStyle()).disabled(model.scanningFolder)
+        } content: {
+            if let problem = model.keysProblem {
+                SettingRow(symbol: "key", title: "prod.keys needed", detail: problem, detailLines: 2) {
+                    Button("Settings") { model.screen = .settings }.buttonStyle(QuietButtonStyle(large: true))
                 }
-                if let problem = model.keysProblem {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "key").foregroundStyle(Ink.accent).font(.system(size: 11))
-                        Text(problem).font(.system(size: 11)).foregroundStyle(Ink.secondary)
-                        Spacer(minLength: 0)
-                        Button("Settings") { model.screen = .settings }
-                            .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Ink.accent)
-                    }
-                }
-                if model.folder.games.isEmpty && !model.scanningFolder {
-                    Text(model.folder.packageCount == 0
-                         ? "No NSP, NSZ, XCI or XCZ file in this folder or its subfolders."
-                         : "No game could be recognised in this folder.")
-                        .font(.system(size: 12)).foregroundStyle(Ink.secondary)
-                }
-                ForEach(model.folder.games) { game in
-                    gameRow(game)
-                    if game.id != model.folder.games.last?.id { Divider().overlay(Ink.line) }
-                }
-                if !model.folder.unidentified.isEmpty {
-                    Divider().overlay(Ink.line)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Not recognised").font(.system(size: 11, weight: .medium)).foregroundStyle(Ink.secondary)
-                        ForEach(model.folder.unidentified, id: \.url) { package in
-                            Text("\(package.url.lastPathComponent): \(package.reason)")
-                                .font(.system(size: 10)).foregroundStyle(Ink.secondary).lineLimit(2).textSelection(.enabled)
-                        }
+            }
+            if model.folder.games.isEmpty && !model.scanningFolder {
+                SettingRow(symbol: "magnifyingglass", title: "No game found",
+                           detail: model.folder.packageCount == 0
+                               ? "No NSP, NSZ, XCI or XCZ file in this folder or its subfolders."
+                               : "No game could be recognised in this folder.", detailLines: 2) { EmptyView() }
+            }
+            ForEach(model.folder.games) { game in
+                gameRow(game)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .frame(minHeight: 64)
+                    .overlay(alignment: .top) { Divider().overlay(Ink.line) }
+            }
+            if !model.folder.unidentified.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Not recognised").font(.system(size: 12, weight: .semibold)).foregroundStyle(Ink.secondary)
+                    ForEach(model.folder.unidentified, id: \.url) { package in
+                        Text("\(package.url.lastPathComponent): \(Friendly.text(package.reason))")
+                            .font(.system(size: 11)).foregroundStyle(Ink.secondary).lineLimit(2).textSelection(.enabled)
                     }
                 }
+                .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .top) { Divider().overlay(Ink.line) }
             }
         }
     }
@@ -74,13 +61,13 @@ struct FolderGamesView: View {
                 .buttonStyle(.plain)
                 .disabled(!game.hasBase)
 
-                Thumbnail(image: IconCache.image(key: "folder-\(game.titleID)", data: game.icon), size: 40)
+                Thumbnail(image: IconCache.image(key: "folder-\(game.titleID)", data: game.icon), size: 38)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(model.displayName(titleID: game.titleID, own: game.name))
-                        .font(.system(size: 13, weight: .medium)).foregroundStyle(Ink.primary).lineLimit(1)
-                    Text("\(game.titleID) · \(game.summary)")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(Ink.secondary).lineLimit(1)
+                        .font(.system(size: 14.5, weight: .bold)).foregroundStyle(Ink.primary).lineLimit(1)
+                    Text(game.summary)
+                        .font(.system(size: 12)).foregroundStyle(Ink.secondary).lineLimit(1)
                     badges(game)
                 }
                 Spacer(minLength: 0)
@@ -113,10 +100,11 @@ struct FolderGamesView: View {
                 if let version = game.displayVersion { Pill(text: version) }
                 if let built {
                     // Green when the package already built is the version ticked now.
-                    Pill(text: "built \(built.packageVersion)", color: built.packageVersion == selected ? Ink.good : Ink.secondary)
+                    Pill(text: built.packageVersion == selected ? "built" : "built · other version",
+                         color: built.packageVersion == selected ? Ink.good : Ink.secondary)
                 }
                 if let phone {
-                    Pill(text: "on the iPhone \(phone.packageVersion)",
+                    Pill(text: phone.packageVersion == selected ? "on the iPhone" : "on the iPhone · other version",
                          color: phone.packageVersion == selected ? Ink.good : Ink.secondary)
                 }
             }

@@ -50,27 +50,27 @@ jobs:
         run: |
           swift test --package-path core
           swift test --package-path mac
-      - name: launcher app
-        run: |
-          tools/build_mac.sh --app
-          mkdir -p "$NXPOCKET_OUTPUT"
-          ditto -c -k --keepParent mac/.build/iPorterNX.app "$NXPOCKET_OUTPUT/iPorterNX-macOS.zip"
       - name: iPhone app
         run: |
+          mkdir -p "$NXPOCKET_OUTPUT"
           tools/build_zsign.sh
           tools/build_app.sh --device-unsigned
-          mv "$NXPOCKET_OUTPUT/iPorterNX.ipa" "$NXPOCKET_OUTPUT/iPorterNX-iPhone.ipa"
+      - name: launcher app (carries the iPhone app's IPA, tools/build_mac.sh finds it in the output folder)
+        run: |
+          tools/build_mac.sh --app
+          ditto -c -k --keepParent mac/.build/NXPocketApple.app "$NXPOCKET_OUTPUT/NXPocketApple-macOS.zip"
+          mv "$NXPOCKET_OUTPUT/NXPocketApple.ipa" "$NXPOCKET_OUTPUT/NXPocketApple-iPhone.ipa"
       - name: SideStore source and checksums
         run: |
           cd "$NXPOCKET_OUTPUT"
-          python3 "$GITHUB_WORKSPACE/tools/make_source.py" iPorterNX-iPhone.ipa "$VERSION" "$BUILD_NUMBER" \
-            "https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/iPorterNX-iPhone.ipa" source.json
-          shasum -a 256 iPorterNX-macOS.zip iPorterNX-iPhone.ipa source.json > SHA256SUMS
+          python3 "$GITHUB_WORKSPACE/tools/make_source.py" NXPocketApple-iPhone.ipa "$VERSION" "$BUILD_NUMBER" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/NXPocketApple-iPhone.ipa" source.json
+          shasum -a 256 NXPocketApple-macOS.zip NXPocketApple-iPhone.ipa source.json > SHA256SUMS
           cat SHA256SUMS
       - name: publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd "$NXPOCKET_OUTPUT"
-          gh release create "$TAG" iPorterNX-macOS.zip iPorterNX-iPhone.ipa source.json SHA256SUMS \
-            --repo "$GITHUB_REPOSITORY" --title "iPorterNX $VERSION · macOS + iPhone" --generate-notes --verify-tag
+          gh release create "$TAG" NXPocketApple-macOS.zip NXPocketApple-iPhone.ipa source.json SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --title "NXPocketApple $VERSION · macOS + iPhone" --generate-notes --verify-tag

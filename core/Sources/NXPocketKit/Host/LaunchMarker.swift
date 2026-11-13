@@ -36,8 +36,9 @@ public struct LaunchMarker: Codable, Equatable, Sendable {
         let fileManager = FileManager.default
         let url = url(in: documents)
         guard fileManager.fileExists(atPath: url.path) else { return nil }
-        guard let handle = try? FileHandle(forReadingFrom: url), let data = try? handle.readToEnd() else { return nil }
-        try? handle.close()
+        // Read at every launch, from a folder Files can write to: a marker of several gigabytes would kill the app
+        // before its first screen, at every start, until someone deleted it by hand.
+        guard let data = BoundedRead.dataIfPresent(at: url, fileManager: fileManager) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try? decoder.decode(LaunchMarker.self, from: data)

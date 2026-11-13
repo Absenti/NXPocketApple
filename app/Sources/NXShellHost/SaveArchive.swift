@@ -1,6 +1,7 @@
 import Compression
 import Foundation
 import NXPocketKit
+import zlib
 
 /// The .zip of a save export, made by the system (`NSFileCoordinator` zips a folder it is asked to read "for
 /// uploading"), and read back here: iOS has no public way to open a .zip. Only what a save copy needs: stored and
@@ -194,7 +195,24 @@ enum CRC32 {
 
     static let start: UInt32 = 0xFFFF_FFFF
 
+    /// zlib's `crc32` does the work (hardware-assisted on Apple silicon): a save of a gigabyte went through this one
+    /// byte at a time in Swift, the longest step of an import or an export. zlib takes and gives the finished value, this
+    /// type keeps the running one the zip format's callers expect, so it is inverted on the way in and out.
     static func update(_ crc: UInt32, _ bytes: UnsafeRawBufferPointer) -> UInt32 {
+        guard var base = bytes.baseAddress?.assumingMemoryBound(to: UInt8.self), bytes.count > 0 else { return crc }
+        var value = UInt(crc ^ 0xFFFF_FFFF)
+        var left = bytes.count
+        while left > 0 {
+            let take = min(left, 1 << 30)
+            value = zlib.crc32(value, base, UInt32(take))
+            base += take
+            left -= take
+        }
+        return UInt32(truncatingIfNeeded: value) ^ 0xFFFF_FFFF
+    }
+
+    /// The byte-at-a-time version, kept as the reference the tests compare zlib's answer with.
+    static func referenceUpdate(_ crc: UInt32, _ bytes: UnsafeRawBufferPointer) -> UInt32 {
         var crc = crc
         for byte in bytes { crc = table[Int((crc ^ UInt32(byte)) & 0xFF)] ^ (crc >> 8) }
         return crc

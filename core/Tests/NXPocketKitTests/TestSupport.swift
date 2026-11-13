@@ -164,7 +164,7 @@ struct MachOBuilder {
 
 /// A synthetic `CS_SuperBlob`, big-endian like the real thing.
 struct CodeSignatureBuilder {
-    var identifier = "dev.nxpocket.app"
+    var identifier = "dev.nxpocketapple.app"
     var teamID: String? = "ABCDE12345"
     var flags: UInt32 = 0
     var certificate: String? = "Apple Development: Example (ABCDE12345)"
@@ -268,6 +268,10 @@ struct PackageFixture {
     var hiddenMachO = false
     var brokenHash = false
     var brokenSize = false
+    /// Lists every file with an empty `sha256`, as a hostile sender could.
+    var emptyHashes = false
+    /// The `romfs_id` package.json states, whatever the image is; nil states the image's own.
+    var romfsIDOverride: String?
     var executableImage: Data?
     var listedPathOverride: String?
     /// The executable Info.plist names; the manifest always names "DmGame".
@@ -331,6 +335,7 @@ struct PackageFixture {
                                               sha256: try FileDigest.sha256(ofFileAt: item.url))
             if brokenHash, item.relativePath == "DmGame" { entry.sha256 = String(repeating: "0", count: 64) }
             if brokenSize, item.relativePath == "Info.plist" { entry.size += 1 }
+            if emptyHashes { entry.sha256 = "" }
             if let listedPathOverride, item.relativePath == "DmGame" { entry.path = listedPathOverride }
             return entry
         }
@@ -340,7 +345,7 @@ struct PackageFixture {
         var romfsSize: Int64 = 0
         if withRomfs {
             let identity = try RomfsFixture.writeImage(at: workspace.url("\(folder)/romfs.img"))
-            romfsID = identity.description
+            romfsID = romfsIDOverride ?? identity.description
             romfsSize = Int64(identity.size)
         }
 
@@ -380,7 +385,7 @@ struct RecordingSigner: FrameworkSigner {
 }
 
 extension XCTestCase {
-    func identity(identifier: String = "dev.nxpocket.app", team: String = "ABCDE12345",
+    func identity(identifier: String = "dev.nxpocketapple.app", team: String = "ABCDE12345",
                   expiresIn days: Double = 5) -> SigningIdentity {
         SigningIdentity(identifier: identifier, teamID: team, certificateSHA256: String(repeating: "a", count: 64),
                         subject: "Apple Development: Example (\(team))", expires: Date().addingTimeInterval(days * 86400))

@@ -87,6 +87,43 @@ extension AppModel {
         transferControl?.cancel()
     }
 
+    /// Stops the engine of the build under way, and everything it started, where they are: nothing is lost and nothing
+    /// is computed meanwhile, so the Mac is free for something else. `resumeBuild` goes on from the same point.
+    public func pauseBuild(_ id: UUID) {
+        guard let item = queue.first(where: { $0.id == id }), item.canPause, !item.isPaused,
+              let runner, runner.pause() else { return }
+        update(id) { $0.isPaused = true }
+        append("build: paused \(item.name)")
+    }
+
+    public func resumeBuild(_ id: UUID) {
+        guard let item = queue.first(where: { $0.id == id }), item.isPaused else { return }
+        runner?.resume()
+        update(id) { $0.isPaused = false }
+        append("build: resumed \(item.name)")
+    }
+
+    public func togglePause(_ id: UUID) {
+        if queue.first(where: { $0.id == id })?.isPaused == true { resumeBuild(id) } else { pauseBuild(id) }
+    }
+
+    /// Stops one item: a waiting one is cancelled at once; the one under way has its engine or transfer terminated.
+    public func cancelItem(_ id: UUID) {
+        guard let index = queue.firstIndex(where: { $0.id == id }) else { return }
+        if queue[index].phase == .waiting {
+            queue[index].phase = .cancelled
+            return
+        }
+        guard !queue[index].phase.isFinished else { return }
+        cancelledItems.insert(id)
+        if pendingAnswers[id] != nil { answer(id, sendAnyway: false) }
+        if let runner {
+            append("build: cancelling")
+            runner.cancel()
+        }
+        transferControl?.cancel()
+    }
+
     public func removeFromQueue(_ id: UUID) {
         queue.removeAll { $0.id == id && ($0.phase == .waiting || $0.phase.isFinished) }
     }
@@ -120,17 +157,19 @@ extension AppModel {
                 if isCancelled(item.id) { throw NXPocketError(.cancelled, "cancelled after the build") }
                 if let device {
                     try await send(item.id, package: package, to: device)
-                    update(item.id) { $0.phase = .done("built and sent: open iPorterNX on the iPhone to import it") }
+                    update(item.id) { $0.phase = .done("built and sent: open NXPocketApple on the iPhone to import it") }
                 } else {
                     update(item.id) { $0.phase = .done("built \(plan.versionTag ?? "")") }
                 }
             case .send(let package, let device):
                 try await send(item.id, package: package, to: device)
-                update(item.id) { $0.phase = .done("sent: open iPorterNX on the iPhone to import it") }
+                update(item.id) { $0.phase = .done("sent: open NXPocketApple on the iPhone to import it") }
             }
         } catch let error as NXPocketError where error.code == .cancelled {
             update(item.id) { $0.phase = .cancelled }
-            if item.builds { append("\(item.name): \(error.detail)") }
+            // Always said, a send included: it used to be said only for a build, and a send cancelled by the user (the part
+            // already sent is marked for deletion on the phone) left nothing in the log to explain that folder.
+            append("\(item.name): \(error.detail)")
         } catch let error as NXPocketError {
             append("\(item.name): \(error)")
             update(item.id) { $0.phase = .failed(error.detail) }
@@ -143,6 +182,8 @@ extension AppModel {
     func update(_ id: UUID, _ change: (inout QueueItem) -> Void) {
         guard let index = queue.firstIndex(where: { $0.id == id }) else { return }
         change(&queue[index])
+        // An item that is over, or past its build, is not paused whatever its flag said.
+        if queue[index].isPaused, !queue[index].canPause { queue[index].isPaused = false }
     }
 
     private func isCancelled(_ id: UUID) -> Bool {
@@ -156,6 +197,12 @@ extension AppModel {
         let staging = FileManager.default.temporaryDirectory
             .appendingPathComponent("nxpocket-staging-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: staging) }
+        // The work folder as it is before this build writes anything in it (`BuildInputs.prepare` included): a cancel
+        // removes what has appeared since, and never what was there.
+        let footprint = await Task.detached(priority: .userInitiated) { BuildFootprint.capture(plan.workFolder) }.value
+        // Which engine this build began with: if it is another at the end of a failure, that is the first thing to say.
+        let engineRoot = toolchain.engine.root
+        let engineAtStart = await Task.detached(priority: .userInitiated) { EngineIdentity.read(engineRoot) }.value
         try await Task.detached(priority: .userInitiated) { try BuildInputs.prepare(plan) }.value
 
         // The title ID always goes: a merged cartridge dump can hold two games, and naming the one keeps the engine
@@ -165,11 +212,14 @@ extension AppModel {
                                          titleID: plan.titleID,
                                          packageVersion: plan.packageVersion,
                                          language: settings.value.language,
-                                         keepExtracted: settings.value.keepExtracted,
+                                         // The engine keeps the extraction of a framework-only build whatever this says
+                                         // (`--shell-framework` implies `--keep-extracted`): said plainly, not argued with.
+                                         keepExtracted: true,
                                          allowOtherMetal: settings.value.allowOtherMetal,
                                          stagingFolder: staging,
                                          workFolder: plan.workFolder,
-                                         includesDLC: !plan.dlcTitleIDs.isEmpty)
+                                         includesDLC: !plan.dlcTitleIDs.isEmpty,
+                                         expectedVersion: plan.version)
         append("build: \(plan.name) [\(plan.titleID)] \(plan.versionTag ?? "")\(plan.dlcTitleIDs.isEmpty ? "" : " + \(plan.dlcTitleIDs.count) DLC")")
         for input in plan.inputs { append("  \(input.linkName)") }
         append("python: \(toolchain.python.path)")
@@ -198,17 +248,28 @@ extension AppModel {
         await reader.value
         self.runner = nil
         guard result.status == 0, !result.isCancelled else {
-            throw result.isCancelled
-                ? NXPocketError(.cancelled, "build cancelled")
-                : NXPocketError(.engineFailed, lastEngineError ?? "the engine exited with \(result.status)")
+            if result.isCancelled { await discardWork(of: footprint, for: plan, runner: runner, id: id) }
+            if result.isCancelled { throw NXPocketError(.cancelled, "build cancelled") }
+            var reason = lastEngineError ?? "the engine exited with \(result.status)"
+            let engineNow = await Task.detached(priority: .userInitiated) { EngineIdentity.read(engineRoot) }.value
+            if let note = EngineIdentity.changeNote(from: engineAtStart, to: engineNow) {
+                append("build: \(plan.name): \(note)")
+                reason += " — \(note)"
+            }
+            throw NXPocketError(.engineFailed, reason)
         }
 
+        if isCancelled(id) {
+            await discardWork(of: footprint, for: plan, runner: nil, id: id)
+            throw NXPocketError(.cancelled, "cancelled after the build")
+        }
         let output = try builder.outputs(for: request, reportedRomfs: reportedRomfs)
         guard let titleID = TitleID(output.manifest.titleID) else {
             throw NXPocketError(.packageDamaged, "the engine's manifest has no title ID")
         }
         let outputFolder = settings.value.outputURL
         let destination = LocalLibrary.destination(for: titleID, in: outputFolder)
+        let destinationExisted = FileManager.default.fileExists(atPath: destination.path)
         update(id) { $0.phase = .packing(fraction: 0, detail: destination.lastPathComponent) }
         // Hashing the framework (up to a gigabyte with its shaders) and copying the RomFS image are off the main
         // thread: done on it, they held the window for as long.
@@ -226,10 +287,59 @@ extension AppModel {
             _ = try await Task.detached(priority: .userInitiated) { try PackageRenamer.rename(packaged.root, to: custom) }.value
             append("named \(packaged.package.titleID) \(custom), as it was renamed")
         }
+        if isCancelled(id) {
+            // Packing is not interrupted, so a cancel during it is acted on here. A package that did not exist before this
+            // build goes; one it replaced stays (the new one is whole, and the old one cannot be given back).
+            if !destinationExisted {
+                try? FileManager.default.removeItem(at: packaged.root)
+                append("build: \(plan.name) cancelled, the package it had just made is removed")
+            }
+            await discardWork(of: footprint, for: plan, runner: nil, id: id)
+            refreshLibrary()
+            throw NXPocketError(.cancelled, "cancelled while packing")
+        }
         refreshLibrary()
         append("packed \(packaged.package.titleID) \(packaged.manifest.name) \(packaged.package.packageVersion) — "
                + ByteCountFormatter.string(fromByteCount: packaged.package.totalSize, countStyle: .file))
+        await removeDecompressedCopy(of: plan, id: id)
         return packaged.root
+    }
+
+    /// Once the package is built, the `.nsp` / `.xci` the engine made out of an `.nsz` / `.xcz` can go: it is as large as
+    /// the game, the dump it came from is untouched, and the next build decompresses it again. See `DecompressedCopies`.
+    private func removeDecompressedCopy(of plan: BuildPlan, id: UUID) async {
+        guard settings.value.removeDecompressed, plan.compressed else { return }
+        let removed = await Task.detached(priority: .utility) {
+            DecompressedCopies.remove(in: plan.workFolder, keeping: plan.inputs.map(\.source))
+        }.value
+        guard !removed.isEmpty else { return }
+        let size = ByteCountFormatter.string(fromByteCount: removed.bytes, countStyle: .file)
+        append("build: \(plan.name): removed the decompressed copy (\(size)): \(removed.removed.joined(separator: ", ")); the original dump and the package are untouched")
+        update(id) { $0.note = "freed \(size) (decompressed copy)" }
+    }
+
+    /// Takes away what a cancelled build made in its work folder (`BuildFootprint`), once nothing it started is still
+    /// writing there, and says how much that was.
+    private func discardWork(of footprint: BuildFootprint, for plan: BuildPlan, runner: ProcessRunner?, id: UUID) async {
+        append("build: \(plan.name) cancelled, removing what it created")
+        let (stopped, removal) = await Task.detached(priority: .userInitiated) { () -> (Bool, BuildFootprint.Removal) in
+            let stopped = runner?.waitUntilTreeGone() ?? true
+            return (stopped, footprint.removeCreated())
+        }.value
+        if !stopped { append("build: something the engine started was still running after 10 s; the cleanup went on anyway") }
+        let text: String
+        if !footprint.isSafe {
+            text = "its work folder is not one that is cleaned (\(footprint.folder.lastPathComponent)): left as it is"
+        } else if removal.isEmpty {
+            text = "nothing to remove, it had created nothing yet"
+        } else {
+            let size = ByteCountFormatter.string(fromByteCount: removal.bytes, countStyle: .file)
+            text = removal.wholeFolder
+                ? "removed \(footprint.folder.lastPathComponent) (\(size)), all of it was this build's"
+                : "removed \(removal.items) files and folders (\(size)) this build had created in \(footprint.folder.lastPathComponent)"
+        }
+        append("build: \(plan.name): \(text)")
+        update(id) { $0.note = text }
     }
 
     /// One transfer, to the device named by its UDID, looked for again first.
@@ -295,9 +405,10 @@ extension AppModel {
         }
     }
 
-    /// The text of an engine line marked as an error (`[RED] …`), without its colour tag.
+    /// The text of an engine line marked as an error (`[RED] …`), without its colour tag and the clock the engine puts
+    /// before every message (`[21:05:47] [RED] …`).
     nonisolated static func engineError(in message: String) -> String? {
-        let trimmed = message.trimmingCharacters(in: .whitespaces)
+        let trimmed = EngineBuilder.withoutClock(message)
         guard trimmed.hasPrefix("[RED]") else { return nil }
         let text = trimmed.dropFirst("[RED]".count).trimmingCharacters(in: .whitespaces)
         return text.isEmpty ? nil : text

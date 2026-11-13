@@ -154,11 +154,35 @@ final class EngineBuilderTests: XCTestCase {
         XCTAssertThrowsError(try builder().outputs(for: request, reportedRomfs: nil),
                              "without the engine's game files line nothing is guessed")
         XCTAssertThrowsError(try builder().outputs(for: request, reportedRomfs: work.appendingPathComponent("gone.img")))
+        // When the engine's line cannot be read the image of the very version built is taken, from its fixed place,
+        // never the newest one found (v0 here was written later).
+        var versioned = request
+        versioned.expectedVersion = 65536
+        XCTAssertEqual(try builder().outputs(for: versioned, reportedRomfs: nil).romfsImage, image)
+        versioned.expectedVersion = 7
+        XCTAssertThrowsError(try builder().outputs(for: versioned, reportedRomfs: nil), "no image for that version: nothing is guessed")
         // The engine's extract_aoc writes <build folder>/aoc, beside extract/, not inside a version's folder: the
         // launcher looked inside the version's folder and never packed a DLC.
         XCTAssertEqual(EngineBuilder.addOnFolder(romfsImage: image, workFolder: nil)?.resolvingSymlinksInPath().path,
                        work.appendingPathComponent("aoc").resolvingSymlinksInPath().path)
         XCTAssertEqual(EngineBuilder.addOnFolder(romfsImage: nil, workFolder: work)?.lastPathComponent, "aoc")
+    }
+
+    /// What broke every build since 0.2.0, after the whole build: the engine's `say` puts the time before each message
+    /// (`[21:05:47] game files: …`, measured on the engine this launcher syncs), and the launcher looked for the words
+    /// at the start of the line. The Mario Kart build ended in "the engine did not name the game's RomFS image".
+    func testTheEnginesLinesAreReadWithTheClockItPutsBeforeThem() {
+        let line = "[23:23:26] game files: /g/0100_build/extract/v1441792/RomFS.img"
+        XCTAssertEqual(EngineBuilder.romfsImage(inMessage: line)?.path, "/g/0100_build/extract/v1441792/RomFS.img")
+        XCTAssertEqual(EngineBuilder.romfsImage(inMessage: "  [01:02:03]   game files: /a b/RomFS.img  ")?.path, "/a b/RomFS.img")
+        XCTAssertNil(EngineBuilder.romfsImage(inMessage: "[23:23:18] game files: separate (DM_COPY_ROMFS=NO), left out of the app; the image stays at /g/RomFS.img"),
+                     "the engine's other line starting with the same words names no image")
+        XCTAssertNil(EngineBuilder.romfsImage(inMessage: "[23:23:26] game framework: /tmp/x/DmGame.framework"))
+        XCTAssertEqual(EngineBuilder.withoutClock("[21:05:47] app: Mario Kart 8 Deluxe"), "app: Mario Kart 8 Deluxe")
+        XCTAssertEqual(EngineBuilder.withoutClock("[RED] not a clock"), "[RED] not a clock")
+        XCTAssertEqual(EngineBuilder.withoutClock("[1:2:3] too short to be one"), "[1:2:3] too short to be one")
+        XCTAssertEqual(EngineBuilder.withoutClock("[ab:cd:ef] letters"), "[ab:cd:ef] letters")
+        XCTAssertEqual(EngineBuilder.withoutClock("no clock at all"), "no clock at all")
     }
 
     func testTheEnginesGameFilesLineNamesTheImageBuilt() {
@@ -280,7 +304,7 @@ final class SettingsStoreTests: XCTestCase {
 
     func testDefaultsToTheDocumentedFolders() {
         let settings = LauncherSettings()
-        XCTAssertEqual(settings.bundleID, "dev.nxpocket.app")
+        XCTAssertEqual(settings.bundleID, "dev.nxpocketapple.app")
         XCTAssertEqual(settings.outputURL.lastPathComponent, "NXPocket")
         XCTAssertNil(settings.keysURL)
     }
@@ -300,5 +324,15 @@ final class ToolchainTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(version.0, 3)
             XCTAssertGreaterThanOrEqual(version.1, 10)
         }
+    }
+
+    func testSavedSettingsWithThePreRenameBundleIDMoveToTheNewOne() throws {
+        let old = Data(#"{"bundleID": "dev.nxpocket.app", "gameFolder": "/games"}"#.utf8)
+        let decoded = try JSONDecoder().decode(LauncherSettings.self, from: old)
+        XCTAssertEqual(decoded.bundleID, "dev.nxpocketapple.app")
+        XCTAssertEqual(decoded.gameFolder, "/games", "the other settings are kept")
+        let custom = Data(#"{"bundleID": "dev.nxpocket.other"}"#.utf8)
+        XCTAssertEqual(try JSONDecoder().decode(LauncherSettings.self, from: custom).bundleID, "dev.nxpocket.other",
+                       "an identifier the user typed is left alone")
     }
 }

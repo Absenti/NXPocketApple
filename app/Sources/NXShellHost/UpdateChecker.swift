@@ -1,6 +1,6 @@
 import Foundation
 
-/// Whether a newer iPorterNX exists (`UpdateChannel`), checked on demand and, unless the player turned it off, by
+/// Whether a newer NXPocketApple exists (`UpdateChannel`), checked on demand and, unless the player turned it off, by
 /// itself at most once a day. It only reports: SideStore installs the update.
 @MainActor
 public final class UpdateChecker: ObservableObject {

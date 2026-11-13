@@ -5,38 +5,47 @@ import SwiftUI
 /// The library: the games as covers, and above them only what needs the player now (a game arriving from the Mac, an
 /// import, a launch that failed, games to sign again). A game sent from the Mac is imported as it lands
 /// (`ShellHostModel.watchTransfers`), so there is no import button to find.
-public struct ShellRootView: View {
+struct LibraryScreen: View {
     @EnvironmentObject private var model: ShellHostModel
 
     @State private var sheet: Sheet?
     @State private var selected: InstalledGame?
     @StateObject private var actions = GameActionCenter()
+    /// The game in front, kept across tabs and launches; and how the library is shown: one cover at a time, or all.
+    @AppStorage("libraryFocusID") private var focusID = ""
+    @AppStorage("libraryStyle") private var style = "covers"
+    @State private var scrolledID: String?
 
     enum Sheet: Identifiable {
-        case settings
         /// The Logs screen, opened on one log or on the list.
         case logs(LogFile?)
 
         var id: String {
             switch self {
-            case .settings: return "settings"
             case .logs(let open): return "logs:\(open?.id ?? "")"
             }
         }
     }
 
-    public init() {}
+    /// Takes the player to the settings, where the certificate is imported.
+    let openSettings: () -> Void
 
-    public var body: some View {
-        ZStack {
-            ShellInk.background.ignoresSafeArea()
+    init(openSettings: @escaping () -> Void) { self.openSettings = openSettings }
+
+    var body: some View {
+        GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     header
-                    LibraryNotices(openSettings: { sheet = .settings }, openLog: { sheet = .logs($0) })
+                    LibraryNotices(openSettings: openSettings, openLog: { sheet = .logs($0) }, compact: style == "covers" && !model.games.isEmpty)
                     if model.games.isEmpty {
                         // Nothing until the first read of the library is back: "no games yet" would be a lie for a moment.
                         if model.libraryLoaded { emptyState }
+                    } else if style == "covers" {
+                        // The stage fills the screen: the covers sit in the middle of what the header and notices leave.
+                        Spacer(minLength: 0)
+                        covers
+                        Spacer(minLength: 0)
                     } else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 230), spacing: 16, alignment: .top)],
                                   spacing: 22) {
@@ -50,15 +59,16 @@ public struct ShellRootView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-                .padding(.bottom, 24)
+                .padding(.bottom, 110)
+                .frame(minHeight: geometry.size.height, alignment: .top)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .gameActions(actions)
         }
         .preferredColorScheme(.dark)
         .sheet(item: $sheet) { which in
             Group {
                 switch which {
-                case .settings: ShellSettingsView()
                 case .logs(let open): LogsView(open: open)
                 }
             }
@@ -70,6 +80,114 @@ public struct ShellRootView: View {
                 .environmentObject(model)
                 .presentationBackground(ShellInk.background)
         }
+    }
+
+    // MARK: The covers, one at a time
+
+    /// The game in front: the remembered one if it is still there, else the first.
+    private var focused: InstalledGame? {
+        model.games.first { $0.id == focusID } ?? model.games.first
+    }
+
+    private var covers: some View {
+        VStack(spacing: 0) {
+            GeometryReader { geometry in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(model.games) { game in
+                            cover(game)
+                                .frame(width: 230, height: 230)
+                                .padding(.horizontal, 6)
+                                .scrollTransition(axis: .horizontal) { content, phase in
+                                    content
+                                        .scaleEffect(phase.isIdentity ? 1.06 : 0.82)
+                                        .opacity(phase.isIdentity ? 1 : 0.55)
+                                        .rotation3DEffect(.degrees(phase.value * -24), axis: (0, 1, 0), perspective: 0.6)
+                                }
+                                .id(game.id)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .contentMargins(.horizontal, max(0, (geometry.size.width - 242) / 2), for: .scrollContent)
+                .scrollTargetBehavior(.viewAligned)
+                .scrollPosition(id: $scrolledID, anchor: .center)
+            }
+            .frame(height: 290)
+            .padding(.horizontal, -20)
+            .onAppear { scrolledID = focused?.id }
+            .onChange(of: scrolledID) { _, id in if let id { focusID = id } }
+
+            if let game = focused { stage(game) }
+        }
+    }
+
+    private func cover(_ game: InstalledGame) -> some View {
+        Button {
+            if game.id == focused?.id { selected = game } else { withAnimation(.easeOut(duration: 0.3)) { scrolledID = game.id } }
+        } label: {
+            GameIcon(game: game, cornerRadius: 38)
+                .overlay(RoundedRectangle(cornerRadius: 38, style: .continuous).strokeBorder(ShellInk.line))
+                .overlay(alignment: .topLeading) { GameBadge(game: game).padding(14) }
+                .shadow(color: ArtTheme.theme(for: game).glow.opacity(0.45), radius: 26, y: 18)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(model.name(of: game))
+        .contextMenu { GameMenuItems(game: game) { perform($0, on: game) } }
+    }
+
+    /// Under the covers: the game's name, what it is, where it stands in the library, and the two things to do.
+    private func stage(_ game: InstalledGame) -> some View {
+        let size = ByteCountFormatter.string(fromByteCount: game.byteCount, countStyle: .file)
+        let meta = game.version.isEmpty ? size : "v\(game.version) · \(size)"
+        let theme = ArtTheme.theme(for: game)
+        return VStack(spacing: 6) {
+            Text(model.name(of: game)).font(ShellFont.display(30)).foregroundStyle(ShellInk.primary)
+                .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.7)
+            Text(meta).font(.system(size: 13)).foregroundStyle(ShellInk.secondary)
+            dots.padding(.vertical, 14)
+            HStack(spacing: 14) {
+                Button { selected = game } label: {
+                    Text(model.text(.details)).font(ShellFont.body(15, .semibold)).foregroundStyle(ShellInk.primary)
+                        .padding(.horizontal, 24).frame(height: 58)
+                        .background(Color.black.opacity(0.35), in: Capsule())
+                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.14)))
+                }
+                .buttonStyle(.plain)
+                Button { model.play(game) } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: "play.fill").font(.system(size: 16))
+                        Text(model.text(.play)).font(ShellFont.body(17, .semibold))
+                    }
+                    .foregroundStyle(ShellInk.onDeep)
+                    .padding(.horizontal, 30).frame(height: 58)
+                    .background(theme.bright, in: Capsule())
+                    .shadow(color: theme.glow.opacity(0.55), radius: 14, y: 8)
+                }
+                .buttonStyle(.plain)
+                .disabled(game.isBroken)
+                .opacity(game.isBroken ? 0.4 : 1)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 8)
+        .animation(.easeInOut(duration: 0.25), value: game.id)
+    }
+
+    /// One dot per game, the current one long; at most nine, around the current one.
+    private var dots: some View {
+        let ids = model.games.map(\.id)
+        let current = ids.firstIndex(of: focused?.id ?? "") ?? 0
+        let first = max(0, min(current - 4, ids.count - 9))
+        let window = Array(ids.indices[first..<min(ids.count, first + 9)])
+        return HStack(spacing: 6) {
+            ForEach(window, id: \.self) { index in
+                Capsule().fill(index == current ? ShellInk.primary : Color.white.opacity(0.3))
+                    .frame(width: index == current ? 22 : 6, height: 6)
+            }
+        }
+        .animation(.easeOut(duration: 0.25), value: current)
+        .accessibilityHidden(true)
     }
 
     /// The settings and the test open the game's screen, where they show; the rest is the menu's own.
@@ -87,22 +205,40 @@ public struct ShellRootView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
-            AppMark(size: 40)
+            AppMark(size: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.text(.library))
-                    .font(.system(size: 28, weight: .bold)).foregroundStyle(ShellInk.primary)
+                    .font(ShellFont.display(26)).foregroundStyle(ShellInk.primary)
                     .lineLimit(1).minimumScaleFactor(0.7)
                 Text(summary).font(.system(size: 12)).foregroundStyle(ShellInk.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
-            Button { sheet = .settings } label: {
-                Image(systemName: "gearshape.fill").font(.system(size: 17)).foregroundStyle(ShellInk.primary)
-                    .frame(width: 42, height: 42)
-                    .background(ShellInk.raised, in: Circle())
+            if style == "covers", !model.games.isEmpty {
+                // The design's pill: the one thing the player has to do, short. No certificate: sign in; games to sign: sign.
+                if model.certificate == nil {
+                    headerPill(model.text(.signIn), action: openSettings)
+                } else if !model.importState.isRunning, !model.gamesNeedingSignature().isEmpty {
+                    headerPill(model.text(.sign)) { model.resignAll() }
+                }
             }
-            .accessibilityLabel(model.text(.settings))
+            if !model.games.isEmpty {
+                Button { withAnimation(.easeOut(duration: 0.2)) { style = style == "covers" ? "grid" : "covers" } } label: {
+                    Image(systemName: style == "covers" ? "square.grid.2x2.fill" : "rectangle.stack.fill")
+                        .font(.system(size: 16)).foregroundStyle(ShellInk.primary)
+                        .frame(width: 42, height: 42)
+                        .background(ShellInk.raised, in: Circle())
+                }
+                .accessibilityLabel(model.text(style == "covers" ? .showGrid : .showCovers))
+            }
         }
         .padding(.top, 6)
+    }
+
+    private func headerPill(_ text: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text).font(ShellFont.body(12, .semibold)).foregroundStyle(ShellInk.onDeep)
+                .lineLimit(1).padding(.horizontal, 14).padding(.vertical, 9).background(ShellInk.deep, in: Capsule())
+        }
     }
 
     /// "2 games · 6.3 GB · 69 GB free", without the games' size while there are none.
@@ -120,8 +256,10 @@ public struct ShellRootView: View {
                 .font(.system(size: 13)).foregroundStyle(ShellInk.secondary)
                 .multilineTextAlignment(.center).frame(maxWidth: 320)
         }
+        .padding(32)
         .frame(maxWidth: .infinity)
-        .padding(.top, 70)
+        .shellStitched(radius: 22)
+        .padding(.top, 50)
     }
 }
 
@@ -146,12 +284,12 @@ struct GameTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            GameIcon(game: game, cornerRadius: 16)
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(ShellInk.line))
-                .overlay(alignment: .topLeading) { badge.padding(8) }
+            GameIcon(game: game, cornerRadius: 20)
+                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(ShellInk.line))
+                .overlay(alignment: .topLeading) { GameBadge(game: game).padding(8) }
                 .shadow(color: .black.opacity(0.4), radius: 10, y: 5)
             Text(model.name(of: game))
-                .font(.system(size: 14, weight: .semibold)).foregroundStyle(ShellInk.primary)
+                .font(.system(size: 14, weight: .bold)).tracking(-0.2).foregroundStyle(ShellInk.primary)
                 .lineLimit(2).multilineTextAlignment(.leading)
             Text(details).font(.system(size: 11)).foregroundStyle(ShellInk.secondary).lineLimit(1)
         }
@@ -162,9 +300,15 @@ struct GameTile: View {
         let size = ByteCountFormatter.string(fromByteCount: game.byteCount, countStyle: .file)
         return game.version.isEmpty ? size : "v\(game.version) · \(size)"
     }
+}
+
+/// The mark a game carries only when something stands between it and Play.
+struct GameBadge: View {
+    @EnvironmentObject private var model: ShellHostModel
+    let game: InstalledGame
 
     @ViewBuilder
-    private var badge: some View {
+    var body: some View {
         if game.problem != nil {
             TileBadge(text: model.text(.broken), color: ShellInk.bad)
         } else if game.isExpired() {
@@ -175,13 +319,13 @@ struct GameTile: View {
     }
 }
 
-private struct TileBadge: View {
+struct TileBadge: View {
     let text: String
     let color: Color
 
     var body: some View {
         Text(text)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 10, weight: .bold))
             .padding(.horizontal, 7).padding(.vertical, 3)
             .background(.black.opacity(0.7), in: Capsule())
             .overlay(Capsule().strokeBorder(color.opacity(0.8)))
@@ -204,32 +348,19 @@ public struct GameDetailView: View {
     @State private var showingTouchControls = false
     @StateObject private var actions = GameActionCenter()
 
+    /// The colours this game lends the screen, from its picture.
+    private var theme: GameTheme { ArtTheme.theme(for: game) }
+
     public var body: some View {
         ZStack {
             ShellInk.background.ignoresSafeArea()
+            // A soft wash of the game's colour from the top, behind everything.
+            RadialGradient(colors: [theme.glow.opacity(0.24), theme.glow.opacity(0.06), .clear],
+                           center: UnitPoint(x: 0.2, y: 0.0), startRadius: 0, endRadius: 520)
+                .ignoresSafeArea().allowsHitTesting(false)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .top, spacing: 16) {
-                        icon
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(model.name(of: game)).font(.system(size: 22, weight: .semibold)).foregroundStyle(ShellInk.primary)
-                            Text(game.titleID.description).font(.system(size: 12, design: .monospaced)).foregroundStyle(ShellInk.secondary)
-                            HStack(spacing: 6) {
-                                if !game.version.isEmpty { ShellPill("v\(game.version)") }
-                                if let chain = game.chain { ShellPill(chain) }
-                                ShellPill(ByteCountFormatter.string(fromByteCount: game.byteCount, countStyle: .file))
-                            }
-                        }
-                        Spacer()
-                        Menu {
-                            GameMenuItems(game: game, showsSettings: false) { actions.perform($0, on: game, model: model) }
-                        } label: {
-                            Image(systemName: "ellipsis").font(.system(size: 17, weight: .semibold)).foregroundStyle(ShellInk.primary)
-                                .frame(width: 40, height: 40)
-                                .background(ShellInk.raised, in: Circle())
-                        }
-                        .accessibilityLabel(model.text(.moreActions))
-                    }
+                    hero
 
                     if let problem = game.problem {
                         ShellCard {
@@ -244,9 +375,10 @@ public struct GameDetailView: View {
 
                     HStack(spacing: 10) {
                         Button(model.text(.play)) { model.play(game) }
-                            .buttonStyle(ShellButtonStyle(prominent: true))
+                            .buttonStyle(ShellButtonStyle(prominent: true, fill: theme.fill, radius: 16))
                             .disabled(game.isBroken)
-                        Button(model.text(.remove)) { actions.removing = game }.buttonStyle(ShellButtonStyle())
+                        Button(model.text(.remove)) { actions.removing = game }
+                            .buttonStyle(ShellButtonStyle(radius: 16, textColor: Color(red: 0.95, green: 0.55, blue: 0.52)))
                     }
 
                     if case .failed(let message) = model.launch {
@@ -258,7 +390,7 @@ public struct GameDetailView: View {
                         }
                     }
 
-                    playTimeCard
+                    statTiles
 
                     if let settings {
                         QuickSettingsCard(settings: settings, choose: choose)
@@ -315,19 +447,61 @@ public struct GameDetailView: View {
     }
 
     /// The time spent in the game and when it was last played, and what it takes on disk.
-    private var playTimeCard: some View {
-        ShellCard {
-            VStack(alignment: .leading, spacing: 8) {
-                ShellSectionLabel(model.text(.playTime))
-                if let time = model.playTime(of: game) {
-                    row(model.text(.playTime), time.total)
-                    row(model.text(.lastPlayed), time.last)
-                } else {
-                    Text(model.text(.neverPlayed)).font(.system(size: 12)).foregroundStyle(ShellInk.secondary)
-                }
-                row(model.text(.gameSize), model.sizeText(game.byteCount))
+    /// The design's header: a band washed with the game's colour and striped like the logo's pocket stitching, the name
+    /// large at its foot, the identifier under it, and the game's menu in the corner.
+    private var hero: some View {
+        var ids = [game.titleID.description]
+        if !game.version.isEmpty { ids.append("v\(game.version)") }
+        if let chain = game.chain { ids.append(chain) }
+        ids.append(ByteCountFormatter.string(fromByteCount: game.byteCount, countStyle: .file))
+        return ZStack(alignment: .bottomLeading) {
+            ShellInk.surface
+            LinearGradient(colors: [theme.glow.opacity(0.80), theme.glow.opacity(0.22)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            StripePattern()
+            LinearGradient(colors: [.clear, .black.opacity(0.5)], startPoint: .center, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(model.name(of: game)).font(ShellFont.display(28)).foregroundStyle(.white)
+                    .lineLimit(2).minimumScaleFactor(0.7)
+                Text(ids.joined(separator: " · ")).font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.75)).lineLimit(1).minimumScaleFactor(0.8)
             }
+            .padding(20)
         }
+        .frame(height: 210)
+        .overlay(alignment: .topTrailing) {
+            Menu {
+                GameMenuItems(game: game, showsSettings: false) { actions.perform($0, on: game, model: model) }
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(Color.black.opacity(0.35), in: Circle())
+            }
+            .accessibilityLabel(model.text(.moreActions))
+            .padding(16)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(Color.white.opacity(0.08)))
+    }
+
+    /// Play time and saves, side by side.
+    private var statTiles: some View {
+        let time = model.playTime(of: game)
+        return HStack(spacing: 12) {
+            tile(model.text(.playTime), time?.total ?? model.text(.neverPlayed), caption: time.map { "\(model.text(.lastPlayed)) · \($0.last)" })
+            tile(model.text(.saves), model.sizeText(model.saveBytes(game)), caption: nil)
+        }
+    }
+
+    private func tile(_ label: String, _ value: String, caption: String?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.system(size: 11)).foregroundStyle(ShellInk.secondary)
+            Text(value).font(ShellFont.display(19, .semibold)).foregroundStyle(ShellInk.primary).lineLimit(1).minimumScaleFactor(0.6)
+            if let caption { Text(caption).font(.system(size: 11)).foregroundStyle(ShellInk.secondary).lineLimit(1) }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ShellInk.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(ShellInk.line))
     }
 
     /// The game's logs, one per start: the newest one's date, and the list.
@@ -382,10 +556,6 @@ public struct GameDetailView: View {
         }
     }
 
-    private var icon: some View {
-        GameIcon(game: game, cornerRadius: 14).frame(width: 84, height: 84)
-    }
-
     /// Keeps a choice at once: the next Play reads it from disk.
     private func choose(_ env: String, _ value: String) {
         guard let settings else { return }
@@ -399,5 +569,24 @@ public struct GameDetailView: View {
             Text(value).font(.system(size: 12)).foregroundStyle(ShellInk.primary)
                 .multilineTextAlignment(.trailing).textSelection(.enabled)
         }
+    }
+}
+
+
+/// Diagonal stripes over a band of colour: the texture of the design's cards, and of the logo's stitching.
+struct StripePattern: View {
+    var body: some View {
+        Canvas { context, size in
+            var x = -size.height
+            while x < size.width {
+                var line = Path()
+                line.move(to: CGPoint(x: x, y: size.height))
+                line.addLine(to: CGPoint(x: x + size.height, y: 0))
+                context.stroke(line, with: .color(.white.opacity(0.06)), lineWidth: 10)
+                x += 26
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }

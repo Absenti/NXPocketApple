@@ -36,7 +36,7 @@ final class SaveBackupTests: XCTestCase {
             RemoteFile(path: "\(titleID)/temp/x", size: 5, date: "", isDirectory: false),
             RemoteFile(path: "010051F0207B2000/save/other.bin", size: 9, date: "", isDirectory: false),
         ] + extra
-        return PhoneSnapshot(deviceUDID: phone.udid, bundleID: "dev.nxpocket.app.X", games: [], files: files)
+        return PhoneSnapshot(deviceUDID: phone.udid, bundleID: "dev.nxpocketapple.app.X", games: [], files: files)
     }
 
     /// Plays devicectl: a copy from the phone writes what the listing says, `short` bytes fewer for one file.

@@ -37,6 +37,12 @@ public struct QueueItem: Identifiable, Equatable {
     public var job: Job
     public var phase: Phase = .waiting
     public var deviceName: String?
+    /// The engine of this build is stopped where it is (`AppModel.pauseBuild`). The phase keeps its progress, so the
+    /// bar and the stage stay on screen while it waits.
+    public var isPaused = false
+    /// What became of the work a cancelled build had done ("removed 3.2 GB it had created"), or what a finished build
+    /// freed ("removed the decompressed copy, 14.1 GB").
+    public var note: String?
 
     public init(id: UUID = UUID(), titleID: String, name: String, job: Job, deviceName: String? = nil) {
         self.id = id
@@ -47,6 +53,9 @@ public struct QueueItem: Identifiable, Equatable {
     }
 
     public var builds: Bool { if case .build = job { return true }; return false }
+
+    /// Only a build under way can be paused: packing is the launcher's own work and a send is `devicectl`'s.
+    public var canPause: Bool { if case .building = phase { return true }; return false }
     public var sends: Bool {
         switch job {
         case .build(_, let device): return device != nil
@@ -74,13 +83,13 @@ public struct QueueItem: Identifiable, Equatable {
     public var status: String {
         switch phase {
         case .waiting: return builds ? (sends ? "waiting: build, then send" : "waiting: build") : "waiting: send"
-        case .building(let stage, _, _, _): return "building · \(stage)"
+        case .building(let stage, _, _, _): return isPaused ? "paused · \(stage)" : "building · \(stage)"
         case .packing: return "packing"
         case .sending: return "sending to \(deviceName ?? "the iPhone")"
         case .needsAnswer(let question): return question
-        case .done(let summary): return summary
+        case .done(let summary): return note.map { "\(summary) · \($0)" } ?? summary
         case .failed(let reason): return reason
-        case .cancelled: return "cancelled"
+        case .cancelled: return note.map { "cancelled · \($0)" } ?? "cancelled"
         }
     }
 

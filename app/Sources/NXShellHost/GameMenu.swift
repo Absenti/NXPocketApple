@@ -174,11 +174,11 @@ private struct GameActionsModifier: ViewModifier {
                 Color.clear.confirmationDialog(model.text(.remove), isPresented: isSet(\.removing), titleVisibility: .visible,
                                                presenting: center.removing) { game in
                     Button(model.text(.removeKeepSaves)) {
-                        model.remove(game, saves: false)
+                        model.remove(game, includingSaves: false)
                         removed(game)
                     }
                     Button(model.text(.removeEverything), role: .destructive) {
-                        model.remove(game, saves: true)
+                        model.remove(game, includingSaves: true)
                         removed(game)
                     }
                     Button(model.text(.cancel), role: .cancel) {}

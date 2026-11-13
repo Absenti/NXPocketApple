@@ -6,7 +6,7 @@ import Security
 /// written to a file. `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` keeps it off backups and off other devices.
 public enum Keychain {
     public enum Service: String {
-        case certificate = "dev.nxpocket.certificate"
+        case certificate = "dev.nxpocketapple.certificate"
     }
 
     /// The .p12 and its password together, in one item: one write replaces both or neither.

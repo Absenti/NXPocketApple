@@ -1,9 +1,15 @@
-iPorterNX notice
+NXPocketApple notice
 
 This file records where the project comes from and what it depends on. The licence text is in LICENSE.
 
-iPorterNX is an independent shell: it holds a library of games, imports packages a Mac app built, signs them on the
+NXPocketApple is an independent shell: it holds a library of games, imports packages a Mac app built, signs them on the
 device, and starts one. The engine that runs a game is not part of this repository.
+
+The fonts
+
+  Outfit, https://github.com/Outfitio/Outfit-Fonts, SIL Open Font License 1.1, Copyright 2021 The Outfit Project Authors.
+  DM Sans, https://github.com/googlefonts/dm-fonts, SIL Open Font License 1.1, Copyright 2014 The DM Sans Project Authors.
+  Both ship in app/Resources/Fonts with their licences, unmodified (the variable files from the Google Fonts repository).
 
 The engine
 
@@ -16,7 +22,7 @@ The engine
   revision NX2Apple pins, then links it as engine/. The Mac launcher drives that tree. The iPhone app links none of it:
   each game's framework carries its own engine host (docs/ENGINE.md).
 
-  What iPorterNX reuses from them, and where:
+  What NXPocketApple reuses from them, and where:
 
   - The RomFS image identity (FNV-1a 64 over the header and the index, `romfs_id_of_image` in
     dm/host/romfs_identity.h). Reimplemented in core/Sources/NXPocketKit/Package/RomfsIdentity.swift, with tests.

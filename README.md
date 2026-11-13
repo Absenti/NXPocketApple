@@ -1,4 +1,4 @@
-# iPorterNX
+# NXPocketApple
 
 Play your own Switch games on your iPhone. A Mac launcher builds them from your dumps; an iPhone app signs and runs
 them, without reinstalling the app for each game.
@@ -27,28 +27,32 @@ them, without reinstalling the app for each game.
 ## Requirements
 
 - Apple silicon Mac, macOS 13+, full Xcode (the Command Line Tools are not enough).
-- iPhone 15 Pro or newer, on iOS 26+, with [SideStore](https://sidestore.io).
+- iPhone 15 Pro or newer, on iOS 26+, with [SideStore](https://sidestore.io) or another signing store (FlareStore, …):
+  what matters is the `.p12` of the certificate that signed the app.
 - Your own dumps and your own `prod.keys`.
 
 ## Install
 
-1. **Mac:** download `iPorterNX-macOS.zip` from the [latest release](https://github.com/Absenti/iPorterNX/releases/latest),
-   move `iPorterNX.app` to Applications, and clear the download quarantine once (see below). Its **Setup** screen
+1. **Mac:** download `NXPocketApple-macOS.zip` from the [latest release](https://github.com/Absenti/NXPocketApple/releases/latest),
+   move `NXPocketApple.app` to Applications, and clear the download quarantine once (see below). Its **Setup** screen
    installs the rest (Python, XcodeGen, the engine), every download pinned and checked. No Homebrew, no admin password.
-2. **iPhone:** in SideStore, add this source and install iPorterNX from it:
-   `https://github.com/Absenti/iPorterNX/releases/latest/download/source.json`
-3. Export the certificate from SideStore as a `.p12`, then import it in iPorterNX: **Settings → Certificate**.
+2. **iPhone:** the launcher's **iPhone app** screen keeps the latest iPhone app (the release's IPA, checked against its
+   SHA-256) up to date by itself: copy it to iCloud Drive and install it from SideStore's **+** (or sign and install it
+   with your own store). Or, in SideStore, add this source and install NXPocketApple from it:
+   `https://github.com/Absenti/NXPocketApple/releases/latest/download/source.json`
+3. Get the `.p12` of the certificate that signed the app (in SideStore: export it; with another store, use the one it
+   gave you), then import it in NXPocketApple: **Settings → Certificate**.
 4. In the launcher, pick your games folder and `prod.keys`, build, and send.
 
 Never install the IPA by opening it from Files: iOS installs a second copy that will not start.
 
-### "Apple could not verify iPorterNX is free of malware"
+### "Apple could not verify NXPocketApple is free of malware"
 
 The launcher is signed ad hoc, not notarized by Apple (that needs a paid Developer ID), so macOS blocks it the first
 time. Either run, once:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/iPorterNX.app
+xattr -dr com.apple.quarantine /Applications/NXPocketApple.app
 ```
 
 or open it, then **System Settings → Privacy & Security → Open Anyway**. Updates installed by the launcher itself are
@@ -62,12 +66,12 @@ The launcher updates itself from GitHub releases. SideStore updates the iPhone a
 
 ```bash
 tools/bootstrap.sh                     # engine and patches
-tools/build_mac.sh --app               # launcher -> mac/.build/iPorterNX.app
+tools/build_mac.sh --app               # launcher -> mac/.build/NXPocketApple.app
 tools/build_zsign.sh                   # on-device signer (zsign + OpenSSL, pinned)
 tools/build_app.sh --device-unsigned   # IPA for SideStore
 ```
 
-Tests: `swift test --package-path core`, `swift test --package-path mac`, and `xcodebuild test` on `app/` (see
+Tests: `swift test --package-path core`, `swift test --package-path mac`, and `tools/test_app.sh` for the iPhone app (see
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)). Releases: bump `VERSION`, push tag `v<VERSION>`; CI builds and
 publishes everything.
 

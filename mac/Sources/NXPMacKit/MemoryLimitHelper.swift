@@ -1,24 +1,45 @@
 import Foundation
 import NXPocketKit
 
-/// Turns on "Increased Memory Limit" for the App ID SideStore registered for iPorterNX, the way it was done by hand on
+/// Turns on "Increased Memory Limit" for the App ID SideStore registered for NXPocketApple, the way it was done by hand on
 /// 2026-11-10 (GetMoreRam did not work for this user): a one-off app whose bundle ID is exactly that App ID, with
 /// the entitlement, built once for a device with Xcode's automatic signing. Xcode then turns the capability on for
-/// the App ID on Apple's side; nothing it builds is installed. SideStore's next install or refresh of iPorterNX
+/// the App ID on Apple's side; nothing it builds is installed. SideStore's next install or refresh of NXPocketApple
 /// carries the entitlement, since it signs with what the App ID allows.
 public enum MemoryLimitHelper {
     public static let entitlement = "com.apple.developer.kernel.increased-memory-limit"
     public static let scheme = "EnableMemoryLimit"
 
-    /// The App ID and the team, read from the bundle ID SideStore installed iPorterNX under: SideStore appends the
-    /// team to it (`dev.nxpocket.app.ABCDE12345`).
+    /// The App ID and the team, read from the bundle ID SideStore installed NXPocketApple under: SideStore appends the
+    /// team to it (`dev.nxpocketapple.app.ABCDE12345`).
     public struct Target: Equatable, Sendable {
         public var bundleID: String
         public var team: String
     }
 
+    /// How the app reached the phone, told from the bundle ID it is installed under. Both are fine for playing:
+    /// the games are signed on the phone with the .p12 of whatever certificate signed the app, store or no store.
+    public enum Installation: Equatable, Sendable {
+        /// SideStore and AltStore append the team to the ID, so the App ID is the user's own and Xcode can change it.
+        case teamSigned(Target)
+        /// Any other store or tool (FlareStore, Sideloadly, TrollStore, Xcode, an enterprise store...) keeps the ID
+        /// as it is. The App ID then belongs to whoever signs, and this Mac cannot change it.
+        case other(bundleID: String)
+
+        public var bundleID: String {
+            switch self {
+            case .teamSigned(let target): target.bundleID
+            case .other(let bundleID): bundleID
+            }
+        }
+    }
+
+    public static func installation(installed: String, base: String) -> Installation {
+        target(installed: installed, base: base).map(Installation.teamSigned) ?? .other(bundleID: installed)
+    }
+
     /// Nil when `installed` does not end in a team ID: the app was installed under its plain ID, by Xcode or
-    /// another tool, and the team cannot be told from it.
+    /// another store or tool, and the team cannot be told from it.
     public static func target(installed: String, base: String) -> Target? {
         guard installed.hasPrefix(base + ".") else { return nil }
         let team = String(installed.dropFirst(base.count + 1))
@@ -46,8 +67,8 @@ public enum MemoryLimitHelper {
 
     public static func projectYAML(_ target: Target) -> String {
         """
-        # One-off helper made by the iPorterNX launcher: asks Apple, through Xcode's automatic signing, to enable
-        # "Increased Memory Limit" on the App ID SideStore registered for iPorterNX. Nothing it builds is installed.
+        # One-off helper made by the NXPocketApple launcher: asks Apple, through Xcode's automatic signing, to enable
+        # "Increased Memory Limit" on the App ID SideStore registered for NXPocketApple. Nothing it builds is installed.
         name: \(scheme)
         options:
           deploymentTarget:

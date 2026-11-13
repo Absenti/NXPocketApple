@@ -1,16 +1,16 @@
 import Foundation
 
 /// The app's only network call: one GET of the SideStore source the project publishes with each release, to say
-/// whether a newer iPorterNX exists. Nothing about the player or the phone is sent: no cookie, no cache, no query, no
+/// whether a newer NXPocketApple exists. Nothing about the player or the phone is sent: no cookie, no cache, no query, no
 /// identifier beyond what any HTTP client sends. Installing an update is SideStore's job, never this app's.
 public enum UpdateChannel {
     /// The source CI publishes with each release (AltStore/SideStore source format). It stays at this address.
-    public static let sourceURL = URL(string: "https://github.com/Absenti/iPorterNX/releases/latest/download/source.json")!
-    public static let bundleID = "dev.nxpocket.app"
+    public static let sourceURL = URL(string: "https://github.com/Absenti/NXPocketApple/releases/latest/download/source.json")!
+    public static let bundleID = "dev.nxpocketapple.app"
     public static let timeout: TimeInterval = 10
     static let maxBytes = 1 << 20
 
-    /// `sidestore://source?url=…`: SideStore adds the source and lists iPorterNX's releases from it.
+    /// `sidestore://source?url=…`: SideStore adds the source and lists NXPocketApple's releases from it.
     public static var addSourceURL: URL {
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-._~")
@@ -37,7 +37,7 @@ public enum UpdateChannel {
         case failed(String)
     }
 
-    /// iPorterNX's newest release in a source: the app with this bundle ID, its `versions` (the newest of them, by
+    /// NXPocketApple's newest release in a source: the app with this bundle ID, its `versions` (the newest of them, by
     /// version then build) or, in an older source, the app's own `version` fields.
     public static func newestRelease(in data: Data, bundleID: String = bundleID) -> Release? {
         guard let source = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

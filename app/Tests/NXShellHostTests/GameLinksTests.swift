@@ -42,14 +42,14 @@ final class ShortcutProfileTests: XCTestCase {
     override func tearDown() { fixture.remove() }
 
     func testTheProfileHoldsOneWebClipOpeningTheGameWithIdentifiersThatOnlyTheTitleIDDecides() throws {
-        let texts = ShortcutProfile.Texts(label: "South Park", displayName: "iPorterNX : South Park", description: "d")
+        let texts = ShortcutProfile.Texts(label: "South Park", displayName: "NXPocketApple : South Park", description: "d")
         let url = try ShortcutProfile.write(fixture.game, texts: texts, documents: fixture.documents)
         XCTAssertEqual(url.path, fixture.documents.appendingPathComponent("Shortcuts/South Park.mobileconfig").path)
         let profile = try XCTUnwrap(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
         XCTAssertEqual(profile["PayloadType"] as? String, "Configuration")
-        XCTAssertEqual(profile["PayloadIdentifier"] as? String, "dev.nxpocket.shortcut.\(LibraryFixture.titleID)")
-        XCTAssertEqual(profile["PayloadDisplayName"] as? String, "iPorterNX : South Park")
-        XCTAssertEqual(profile["PayloadOrganization"] as? String, "iPorterNX")
+        XCTAssertEqual(profile["PayloadIdentifier"] as? String, "dev.nxpocketapple.shortcut.\(LibraryFixture.titleID)")
+        XCTAssertEqual(profile["PayloadDisplayName"] as? String, "NXPocketApple : South Park")
+        XCTAssertEqual(profile["PayloadOrganization"] as? String, "NXPocketApple")
         let clips = try XCTUnwrap(profile["PayloadContent"] as? [[String: Any]])
         XCTAssertEqual(clips.count, 1)
         let clip = clips[0]
@@ -189,7 +189,7 @@ final class LaunchHardeningTests: XCTestCase {
 
     func testAnExpiredCertificateDoesNotSignAgain() throws {
         let service = ImportService(documents: fixture.documents, signer: UnavailableSigner())
-        let expired = SigningIdentity(identifier: "dev.nxpocket.app", teamID: "ABCDE12345",
+        let expired = SigningIdentity(identifier: "dev.nxpocketapple.app", teamID: "ABCDE12345",
                                       certificateSHA256: String(repeating: "a", count: 64), subject: "Apple Development: Test",
                                       expires: Date().addingTimeInterval(-60))
         XCTAssertThrowsError(try service.resign(fixture.game, identity: expired)) {
@@ -234,7 +234,7 @@ final class SaveRecoveryTests: XCTestCase {
     }
 
     func testRemovingAGameButNotItsSavesLeavesThemWhereTheyWere() throws {
-        try GameRemoval.remove(fixture.game, saves: false)
+        try GameRemoval.remove(fixture.game, includingSaves: false)
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: fixture.folder.path).sorted(), ["save", "save_meta.dat"])
         XCTAssertEqual(fixture.text("save/slot1.bin"), "old slot")
     }

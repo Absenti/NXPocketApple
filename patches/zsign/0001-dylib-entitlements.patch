@@ -2,8 +2,9 @@ Reason: zsign writes the signing asset's entitlements only into an MH_EXECUTE im
 dict whatever entitlements file it was handed, and no DER entitlements slot in its CodeDirectory (src/archo.cpp,
 BuildCodeSignature). Probe test 5C asks whether a framework in Documents loads once its signature carries the app's
 own entitlements, and without this it silently re-ran 5A: its log showed "entitlements 181 bytes (none)" for both.
-The new flag is off by default, so every existing zsign behaviour is unchanged; tools/zsign_shim.cpp turns it on
-only when no entitlements file is given. Applied by tools/build_zsign.sh on top of the pinned revision.
+The new flag is off by default, so every existing zsign behaviour is unchanged; tools/zsign_shim.cpp always turns it
+on, for the profile's entitlements and for an entitlements file alike. Applied by tools/build_zsign.sh on top of the
+pinned revision.
 
 diff --git a/src/archo.cpp b/src/archo.cpp
 index 0ce2da0..66cf1c0 100644

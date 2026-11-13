@@ -1,4 +1,4 @@
-# iPorterNX : plan d'implémentation (version robuste)
+# NXPocketApple : plan d'implémentation (version robuste)
 
 Ce plan est destiné à l'agent qui code (DeepSeek). Claude fait la revue à la fin de chaque phase. **Arrête-toi à la fin de chaque phase**, puis livre :
 - le diff ;
@@ -9,7 +9,7 @@ Ne passe pas à la phase suivante sans revue.
 
 ## 0. But et règles
 
-**But.** Une app iPhone et iPad, iPorterNX, qui reçoit des jeux Switch déjà convertis par l'ordinateur de l'utilisateur, et les ajoute à sa bibliothèque **sans être réinstallée**.
+**But.** Une app iPhone et iPad, NXPocketApple, qui reçoit des jeux Switch déjà convertis par l'ordinateur de l'utilisateur, et les ajoute à sa bibliothèque **sans être réinstallée**.
 - Le jeu est lancé depuis l'app : ce n'est jamais une nouvelle app.
 - L'ordinateur fait la conversion avec nxnative : déchiffrement avec les `prod.keys` de l'utilisateur, réécriture du code, shaders.
 - L'app stocke les données du jeu dans `Documents`, sans réinstallation.
@@ -75,7 +75,7 @@ On ne l'utilise que si la phase 0c échoue. L'app recopie son bundle en y ajouta
 ## Phase 1 : dépôt et base
 
 1.1 Prépare le dépôt :
-- `git init` dans `iPorterNX/` ;
+- `git init` dans `NXPocketApple/` ;
 - un `.gitignore` qui ignore `probe/build/`, `probe-out/`, `engine/`, `build/`, `*.ipa`, `DerivedData/`, et `*.keys`, `*.p12`, `*.mobileprovision` (pour qu'un fichier sensible ne soit jamais ajouté par erreur) ;
 - une licence MIT avec un `NOTICE` qui crédite nxnative (seedds, MIT) et NX2Apple (MIT) ;
 - un `README.md` court : ce que fait l'app, ce qu'elle ne fait pas (aucune clé ni aucun jeu fourni), et l'avertissement légal.
@@ -87,12 +87,12 @@ On ne l'utilise que si la phase 0c échoue. L'app recopie son bundle en y ajouta
 - Le script échoue clairement si un patch ne s'applique plus.
 - Il est idempotent : il vérifie d'abord avec `git apply --check -R` si le patch est déjà appliqué.
 
-1.4 Récupère les vues : le shell utilise le package Swift `third_party/NX2Apple/frontend-ios` tel quel, via un chemin local. On ne le copie pas. Ce qui nous est propre va dans `app/Sources/iPorterNX*`.
+1.4 Récupère les vues : le shell utilise le package Swift `third_party/NX2Apple/frontend-ios` tel quel, via un chemin local. On ne le copie pas. Ce qui nous est propre va dans `app/Sources/NXPocketApple*`.
 
 1.5 L'app : un projet XcodeGen dans `app/project.yml`. Il part du modèle `engine/dm/ios/project-shell.yml` et du script `engine/dm/ios/tools/build_shell.sh`. Lis les deux en entier avant d'écrire quoi que ce soit.
 - Différence 1 : le shell peut être construit **sans aucun framework de jeu intégré**. Aujourd'hui, `build_shell.sh` en exige au moins un (`DM_SHELL_FRAMEWORKS`). Chaque framework embarque son propre hôte (voir `ShellGlue.h`), donc le shell lui-même n'a pas besoin de l'hôte. Vérifie-le dans `ShellMain.m`. Si c'est faux, arrête-toi et signale-le dans la revue.
 - Différence 2 : la bibliothèque lit aussi `Documents/games/*/DmGame*.framework`, des frameworks re-signés sur l'appareil (phases 3.3 et 3.4).
-- Identifiant de bundle par défaut : `dev.nxpocket.app`. Il ne doit jamais changer pour une installation donnée, sinon `Documents` est perdu.
+- Identifiant de bundle par défaut : `dev.nxpocketapple.app`. Il ne doit jamais changer pour une installation donnée, sinon `Documents` est perdu.
 - `UIFileSharingEnabled` et `LSSupportsOpeningDocumentsInPlace` sont à `true`.
 - La demande « Increased Memory Limit » est reprise comme dans `build_shell.sh`.
 
@@ -231,7 +231,7 @@ Le framework reçu va s'exécuter avec les droits de l'app. Avant de le signer, 
 > est joignable sur le même réseau (mesuré : 33 Mo/s, autant qu'en USB). Le récepteur à code d'appairage décrit
 > au point 2 est retiré : l'app n'ouvre aucun port réseau.
 
-1. **USB (recommandé, le plus rapide).** Utilise `pymobiledevice3` (house_arrest vers le `Documents` de `dev.nxpocket.app`). On copie dans `Documents/.incoming/<uuid>/`, puis on écrit en dernier un fichier `Documents/.incoming/<uuid>/.complete`. L'app surveille `.incoming` et n'importe qu'un dossier qui contient `.complete`. Regarde comment `engine/scripts/push_romfs.sh` copie les fichiers et reprends sa méthode.
+1. **USB (recommandé, le plus rapide).** Utilise `pymobiledevice3` (house_arrest vers le `Documents` de `dev.nxpocketapple.app`). On copie dans `Documents/.incoming/<uuid>/`, puis on écrit en dernier un fichier `Documents/.incoming/<uuid>/.complete`. L'app surveille `.incoming` et n'importe qu'un dossier qui contient `.complete`. Regarde comment `engine/scripts/push_romfs.sh` copie les fichiers et reprends sa méthode.
 2. **Wi-Fi.** L'app lance un serveur `NWListener` (Network.framework) seulement quand l'écran « Recevoir des jeux » est ouvert, annoncé en Bonjour `_nxpocket._tcp`.
    - **Appairage** : l'app affiche un code à 6 chiffres. L'ordinateur et l'app en dérivent une clé (HKDF-SHA256 sur le code plus un sel aléatoire envoyé par l'app). Cette clé est stockée dans le Keychain de l'app et dans `~/.config/nxpocket/` sur l'ordinateur. Chaque requête porte un HMAC-SHA256 (méthode, chemin, horodatage, hash du corps). Une requête non signée, ou vieille de plus de 60 secondes, est refusée. Le serveur n'accepte aucune connexion sans appairage.
    - Envoi par morceaux de 8 Mo, reprenable : `PUT /upload/<uuid>/<chemin>?offset=`, puis `POST /commit/<uuid>`.
