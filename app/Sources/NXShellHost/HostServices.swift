@@ -33,10 +33,31 @@ public enum MemoryBudget {
         ByteCountFormatter.string(fromByteCount: physicalBytes, countStyle: .memory)
     }
 
-    /// Whether the profile that installed this app carries the increased-memory entitlement. Read from the
-    /// embedded profile rather than from a private API.
+    public static let increasedLimitEntitlement = "com.apple.developer.kernel.increased-memory-limit"
+
+    /// Whether this app gets the increased limit. The system enforces what the app's own signature carries, not what
+    /// its profile allows: a store that trims the entitlements it signs with leaves a profile that grants a limit the
+    /// app never receives, and the screen used to say "active" from the profile alone. The profile answers only when
+    /// the signature cannot be read.
     public static var hasIncreasedLimit: Bool {
-        ProvisioningProfile.entitlements()["com.apple.developer.kernel.increased-memory-limit"] != nil
+        hasIncreasedLimit(signed: AppSignature.entitlements, profile: ProvisioningProfile.entitlements())
+    }
+
+    static func hasIncreasedLimit(signed: [String: Any]?, profile: [String: Any]) -> Bool {
+        (signed ?? profile)[increasedLimitEntitlement] as? Bool == true
+    }
+
+    /// One line for the import log, so the Mac side of a bug report can tell what the phone has: the limit the system
+    /// applies, what the signature and the profile each say, and the memory a game can count on.
+    public static var summaryLine: String {
+        func word(_ entitlements: [String: Any]?) -> String {
+            guard let entitlements else { return "unreadable" }
+            return entitlements[increasedLimitEntitlement] as? Bool == true ? "yes" : "no"
+        }
+        return "memory: increased limit \(hasIncreasedLimit ? "active" : "not active") "
+            + "(in the app's signature: \(word(AppSignature.entitlements)), "
+            + "granted by its profile: \(word(ProvisioningProfile.entitlements()))); "
+            + "\(availableText) available of \(physicalText)"
     }
 }
 
@@ -66,6 +87,17 @@ public enum ProvisioningProfile {
     /// The team that installed this app: the certificate that signs a game must belong to it.
     public static func teamID(bundle: Bundle = .main) -> String? {
         (dictionary(bundle: bundle)?["TeamIdentifier"] as? [String])?.first
+    }
+
+    /// The kind of profile an installer embedded, from what Apple writes into it: `ProvisionsAllDevices` is an
+    /// enterprise profile, `get-task-allow` a development one, a device list an ad hoc one, and none of those an App
+    /// Store one. SideStore installs development profiles; most other stores install ad hoc or enterprise ones.
+    public static func kind(of profile: [String: Any]) -> String {
+        if profile["ProvisionsAllDevices"] as? Bool == true { return "enterprise" }
+        let granted = profile["Entitlements"] as? [String: Any]
+        if granted?["get-task-allow"] as? Bool == true { return "development" }
+        if let devices = profile["ProvisionedDevices"] as? [String], !devices.isEmpty { return "ad hoc (\(devices.count) devices)" }
+        return "App Store"
     }
 
     public static func appIdentifier(bundle: Bundle = .main) -> String? {

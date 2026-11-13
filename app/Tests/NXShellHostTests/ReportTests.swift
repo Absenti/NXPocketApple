@@ -5,28 +5,28 @@ import XCTest
 
 final class SigningFactsTests: XCTestCase {
     private let profile: [String: Any] = [
-        "Name": "SideStore dev.nxpocket.app", "TeamIdentifier": ["ABCDE12345"],
+        "Name": "SideStore dev.nxpocketapple.app", "TeamIdentifier": ["ABCDE12345"],
         "ExpirationDate": Date(timeIntervalSince1970: 1_800_000_000),
-        "Entitlements": ["application-identifier": "ABCDE12345.dev.nxpocket.app",
+        "Entitlements": ["application-identifier": "ABCDE12345.dev.nxpocketapple.app",
                          "keychain-access-groups": ["ABCDE12345.*"]],
     ]
 
     func testTheFactsSayWhatTheProfileAndTheSignatureGrantWithoutAnySecret() {
-        let facts = SigningFacts.make(bundleID: "dev.nxpocket.app", signatureIdentifier: "dev.nxpocket.app",
+        let facts = SigningFacts.make(bundleID: "dev.nxpocketapple.app", signatureIdentifier: "dev.nxpocketapple.app",
                                       signatureTeam: "ABCDE12345", profile: profile,
-                                      signed: ["application-identifier": "ABCDE12345.dev.nxpocket.app"])
+                                      signed: ["application-identifier": "ABCDE12345.dev.nxpocketapple.app"])
         let text = facts.lines.joined(separator: "\n")
-        XCTAssertTrue(text.contains("bundle ID: dev.nxpocket.app"))
-        XCTAssertTrue(text.contains("profile application-identifier: ABCDE12345.dev.nxpocket.app"))
+        XCTAssertTrue(text.contains("bundle ID: dev.nxpocketapple.app"))
+        XCTAssertTrue(text.contains("profile application-identifier: ABCDE12345.dev.nxpocketapple.app"))
         XCTAssertTrue(text.contains("profile keychain-access-groups: ABCDE12345.*"))
         XCTAssertTrue(text.contains("signed keychain-access-groups: none"), "the signature granting no group is the -34018 cause")
         XCTAssertTrue(text.contains("team ABCDE12345"))
     }
 
     func testAnAppWithNoProfileAndNoEntitlementsSaysSo() {
-        let facts = SigningFacts.make(bundleID: "dev.nxpocket.app", signatureIdentifier: nil, signatureTeam: nil,
+        let facts = SigningFacts.make(bundleID: "dev.nxpocketapple.app", signatureIdentifier: nil, signatureTeam: nil,
                                       profile: nil, signed: nil)
-        XCTAssertEqual(facts.lines, ["bundle ID: dev.nxpocket.app", "signature: none",
+        XCTAssertEqual(facts.lines, ["bundle ID: dev.nxpocketapple.app", "signature: none",
                                      "profile: no embedded.mobileprovision", "signed entitlements: none"])
     }
 
@@ -37,7 +37,7 @@ final class SigningFactsTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: documents) }
         let model = ShellHostModel(documents: documents, engineHost: UnlinkedEngineHost(), signer: UnavailableSigner())
         model.language = "fr"
-        let facts = SigningFacts.make(bundleID: "dev.nxpocket.app", signatureIdentifier: "dev.nxpocket.app", signatureTeam: nil,
+        let facts = SigningFacts.make(bundleID: "dev.nxpocketapple.app", signatureIdentifier: "dev.nxpocketapple.app", signatureTeam: nil,
                                       profile: profile, signed: [:])
         let message = model.keychainMessage(KeychainRefusal(status: -34018, account: Keychain.identityAccount), facts: facts)
         XCTAssertTrue(message.hasPrefix("Le trousseau a refusé le certificat : la signature"), message)
@@ -63,7 +63,7 @@ final class ErrorReportTests: XCTestCase {
         let report = model.report(error: "dlopen refused DmGame", titleID: LibraryFixture.titleID)
         XCTAssertTrue(report.contains("error: dlopen refused DmGame"))
         XCTAssertTrue(report.contains("game: Fixture (\(LibraryFixture.titleID))"))
-        XCTAssertTrue(report.contains("app: iPorterNX "))
+        XCTAssertTrue(report.contains("app: NXPocketApple "))
         XCTAssertTrue(report.contains("iOS \(UIDevice.current.systemVersion), "))
         XCTAssertTrue(report.contains("certificate: none"))
         XCTAssertTrue(report.contains("bundle ID: "))

@@ -11,7 +11,13 @@ public enum FileDigest {
         }
         defer { try? handle.close() }
         var hasher = SHA256()
-        while let chunk = try? handle.read(upToCount: chunkSize), !chunk.isEmpty {
+        // A read that fails is an error, not the end of the file: swallowing it (`try?`) returned the hash of whatever
+        // was read so far, a hash of a prefix that looked like the hash of the file.
+        while true {
+            let chunk: Data?
+            do { chunk = try handle.read(upToCount: chunkSize) }
+            catch { throw NXPocketError(.packageMissing, "the file could not be read to the end: \(error.localizedDescription)", path: url.path) }
+            guard let chunk, !chunk.isEmpty else { break }
             hasher.update(data: chunk)
         }
         return hex(hasher.finalize())

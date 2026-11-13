@@ -19,10 +19,10 @@ final class PhoneAppTests: XCTestCase {
     func testReadsTheVersionOfAnIPAWithoutUnpackingIt() throws {
         let app = folder.appendingPathComponent("pkg/Payload/NXPocket.app")
         try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
-        let plist: [String: Any] = ["CFBundleShortVersionString": "0.1", "CFBundleVersion": "7", "CFBundleIdentifier": "dev.nxpocket.app"]
+        let plist: [String: Any] = ["CFBundleShortVersionString": "0.1", "CFBundleVersion": "7", "CFBundleIdentifier": "dev.nxpocketapple.app"]
         try PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0)
             .write(to: app.appendingPathComponent("Info.plist"))
-        let ipa = folder.appendingPathComponent("iPorterNX.ipa")
+        let ipa = folder.appendingPathComponent("NXPocketApple.ipa")
         let zip = Process()
         zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
         zip.currentDirectoryURL = folder.appendingPathComponent("pkg")
@@ -31,12 +31,12 @@ final class PhoneAppTests: XCTestCase {
         zip.waitUntilExit()
         let found = try XCTUnwrap(PhoneAppBuild.inspect(ipa))
         XCTAssertEqual(found.versionText, "0.1 (7)")
-        XCTAssertEqual(found.bundleID, "dev.nxpocket.app")
+        XCTAssertEqual(found.bundleID, "dev.nxpocketapple.app")
         XCTAssertNil(PhoneAppBuild.inspect(folder.appendingPathComponent("none.ipa")))
     }
 
     func testFindsTheRepositoryAboveTheLauncher() throws {
-        let repository = folder.appendingPathComponent("iPorterNX")
+        let repository = folder.appendingPathComponent("NXPocketApple")
         let executable = repository.appendingPathComponent("mac/.build/release/NXPocket")
         try FileManager.default.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: repository.appendingPathComponent("tools"), withIntermediateDirectories: true)
@@ -45,7 +45,7 @@ final class PhoneAppTests: XCTestCase {
         try Data().write(to: repository.appendingPathComponent("app/project.yml"))
         try Data().write(to: executable)
         XCTAssertEqual(PhoneAppBuild.repository(from: executable)?.resolvingSymlinksInPath().path, repository.resolvingSymlinksInPath().path)
-        XCTAssertNil(PhoneAppBuild.repository(from: folder.appendingPathComponent("elsewhere/iPorterNX")))
+        XCTAssertNil(PhoneAppBuild.repository(from: folder.appendingPathComponent("elsewhere/NXPocketApple")))
 
         let source = repository.appendingPathComponent("app/Sources/A.swift")
         try Data("x".utf8).write(to: source)
@@ -69,11 +69,23 @@ final class PhoneAppTests: XCTestCase {
     // MARK: - Increased Memory Limit
 
     func testTheTeamIsTheSuffixSideStoreAppends() {
-        XCTAssertEqual(MemoryLimitHelper.target(installed: "dev.nxpocket.app.ABCDE12345", base: "dev.nxpocket.app"),
-                       MemoryLimitHelper.Target(bundleID: "dev.nxpocket.app.ABCDE12345", team: "ABCDE12345"))
-        XCTAssertNil(MemoryLimitHelper.target(installed: "dev.nxpocket.app", base: "dev.nxpocket.app"), "installed by Xcode: no team in it")
-        XCTAssertNil(MemoryLimitHelper.target(installed: "dev.nxpocket.app.beta", base: "dev.nxpocket.app"))
-        XCTAssertNil(MemoryLimitHelper.target(installed: "com.other.ABCDE12345", base: "dev.nxpocket.app"))
+        XCTAssertEqual(MemoryLimitHelper.target(installed: "dev.nxpocketapple.app.ABCDE12345", base: "dev.nxpocketapple.app"),
+                       MemoryLimitHelper.Target(bundleID: "dev.nxpocketapple.app.ABCDE12345", team: "ABCDE12345"))
+        XCTAssertNil(MemoryLimitHelper.target(installed: "dev.nxpocketapple.app", base: "dev.nxpocketapple.app"), "installed by Xcode: no team in it")
+        XCTAssertNil(MemoryLimitHelper.target(installed: "dev.nxpocketapple.app.beta", base: "dev.nxpocketapple.app"))
+        XCTAssertNil(MemoryLimitHelper.target(installed: "com.other.ABCDE12345", base: "dev.nxpocketapple.app"))
+    }
+
+    /// FlareStore (and Sideloadly, TrollStore, Xcode) install the app under its plain ID: a normal installation, which
+    /// the launcher used to report as "App ID not found" because it only knew SideStore's suffixed one.
+    func testAnAppInstalledUnderItsPlainIDIsAnInstallationNotAnError() {
+        let base = "dev.nxpocketapple.app"
+        XCTAssertEqual(MemoryLimitHelper.installation(installed: "dev.nxpocketapple.app.ABCDE12345", base: base),
+                       .teamSigned(MemoryLimitHelper.Target(bundleID: "dev.nxpocketapple.app.ABCDE12345", team: "ABCDE12345")))
+        XCTAssertEqual(MemoryLimitHelper.installation(installed: base, base: base), .other(bundleID: base))
+        XCTAssertEqual(MemoryLimitHelper.installation(installed: base, base: base).bundleID, base)
+        XCTAssertEqual(MemoryLimitHelper.installation(installed: "dev.nxpocketapple.app.beta", base: base),
+                       .other(bundleID: "dev.nxpocketapple.app.beta"), "a suffix that is not a team is not SideStore's")
     }
 
     func testReadsXcodesTeamsFromItsPreferences() {
@@ -83,9 +95,9 @@ final class PhoneAppTests: XCTestCase {
     }
 
     func testTheHelperAsksForTheEntitlementUnderTheAppIDWithAutomaticSigning() throws {
-        let target = MemoryLimitHelper.Target(bundleID: "dev.nxpocket.app.ABCDE12345", team: "ABCDE12345")
+        let target = MemoryLimitHelper.Target(bundleID: "dev.nxpocketapple.app.ABCDE12345", team: "ABCDE12345")
         let yaml = MemoryLimitHelper.projectYAML(target)
-        for line in ["PRODUCT_BUNDLE_IDENTIFIER: dev.nxpocket.app.ABCDE12345", "DEVELOPMENT_TEAM: ABCDE12345",
+        for line in ["PRODUCT_BUNDLE_IDENTIFIER: dev.nxpocketapple.app.ABCDE12345", "DEVELOPMENT_TEAM: ABCDE12345",
                      "CODE_SIGN_STYLE: Automatic", "CODE_SIGN_ENTITLEMENTS: EnableMemoryLimit.entitlements"] {
             XCTAssertTrue(yaml.contains(line), line)
         }

@@ -18,7 +18,7 @@ public enum UpdateState: Equatable {
 }
 
 /// The launcher updates itself from the project's GitHub releases (`LauncherUpdate`): a look at launch at most once a
-/// day, and on demand; the download, its checks and the swap only once the user said so.
+/// day, and nowhere else; the download, its checks and the swap only once the user said so.
 extension AppModel {
     public static let updateInterval: TimeInterval = 24 * 3600
 
@@ -27,27 +27,34 @@ extension AppModel {
     /// Why this copy cannot replace itself (a development build, a read-only place), nil when it can.
     public var updateRefusal: String? { LauncherUpdate.refusal(for: Bundle.main.bundleURL) }
 
+    /// The look at launch always happens (the iPhone app's IPA is kept in step with the same release), but the sheet that
+    /// offers a new launcher opens at most once a day: "Later" is not asked again at the next launch.
     func checkForUpdatesAtLaunch() {
+        guard settings.value.checkUpdates else { return }
         let now = Date().timeIntervalSince1970
-        guard settings.value.checkUpdates, now - settings.value.lastUpdateCheck >= Self.updateInterval else { return }
-        checkForUpdates()
+        checkForUpdates(offerSheet: now - settings.value.lastUpdateCheck >= Self.updateInterval)
     }
 
-    public func checkForUpdates() {
+    public func checkForUpdates(offerSheet: Bool = true) {
         if case .checking = update { return }
         if case .downloading = update { return }
         update = .checking
-        settings.value.lastUpdateCheck = Date().timeIntervalSince1970
+        // Only an offer counts as "asked today": a silent look at launch must not push the next offer a day further.
+        if offerSheet { settings.value.lastUpdateCheck = Date().timeIntervalSince1970 }
         let current = runningVersion
         Task {
-            switch await LauncherUpdate.latest(current: current) {
+            let (outcome, release) = await LauncherUpdate.latestWithRelease(current: current)
+            if let release { latestRelease = release }
+            defer { fetchPhoneAppIfNeeded() }
+            switch outcome {
             case .upToDate(let latest):
-                update = .upToDate("iPorterNX \(current?.description ?? "?") is up to date (latest release \(latest)).")
+                update = .upToDate("NXPocketApple \(current?.description ?? "?") is up to date (latest release \(latest)).")
             case .noPublicChannel:
                 update = .noChannel
             case .available(let release):
                 update = .available(release)
-                append("update: iPorterNX \(release.version) is available")
+                showUpdateSheet = offerSheet
+                append("update: NXPocketApple \(release.version) is available")
             case .failed(let reason):
                 update = .failed(reason)
             }
@@ -67,7 +74,7 @@ extension AppModel {
         let app = Bundle.main.bundleURL
         let current = runningVersion
         update = .downloading(release, fraction: 0)
-        append("update: downloading iPorterNX \(release.version)")
+        append("update: downloading NXPocketApple \(release.version)")
         let (events, sink) = AsyncStream.makeStream(of: Double?.self)
         Task {
             let reader = Task { @MainActor in
@@ -87,7 +94,7 @@ extension AppModel {
                 do {
                     try LauncherUpdate.startSwap(app: app, newApp: newApp, version: current)
                     update = .restarting
-                    append("update: iPorterNX \(release.version) checked; the launcher quits and the new one opens")
+                    append("update: NXPocketApple \(release.version) checked; the launcher quits and the new one opens")
                     NSApplication.shared.terminate(nil)
                 } catch {
                     update = .failed("The update could not start: \(error.localizedDescription)")

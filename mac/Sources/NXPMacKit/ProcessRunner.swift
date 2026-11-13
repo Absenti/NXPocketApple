@@ -26,6 +26,14 @@ public final class ProcessRunner: @unchecked Sendable {
     private var tail = Data()
     private var kept = LineRing(capacity: keptLines)
     private var cancelled = false
+    private var paused = false
+    /// What `pause` stopped, to be woken again by `resume`.
+    private var stoppedPIDs: [pid_t] = []
+    /// The process and everything below it when `cancel` was called: what `waitUntilTreeGone` waits for.
+    private var doomed: [ProcessTree.Member] = []
+
+    /// How long what a cancel told to stop has before it is killed.
+    static let killGrace: TimeInterval = 3
     private var outputFinished = false
     private var exitDelivered = false
 
@@ -81,10 +89,81 @@ public final class ProcessRunner: @unchecked Sendable {
         lock.lock()
         cancelled = true
         lock.unlock()
+        // A stopped process only acts on SIGTERM once it runs again, and what it started must not stay stopped with
+        // nobody left to wake it.
+        resume()
+        // Everything below the process goes with it. Only the process itself used to be told, and what it had started (the
+        // Metal compiler of every shader, Xcode and its build service) carried on after a cancel, burning the Mac and
+        // writing files into the folder the build was about to be cleaned out of.
+        let tree = process.isRunning ? ProcessTree.members(of: process.processIdentifier) : []
+        lock.lock()
+        doomed = tree
+        lock.unlock()
+        ProcessTree.send(SIGTERM, to: tree)
         if process.isRunning { process.terminate() }
+        if !tree.isEmpty {
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + Self.killGrace) {
+                ProcessTree.send(SIGKILL, to: tree)
+            }
+        }
+    }
+
+    /// Waits until the process and everything below it, as they were at the cancel, are gone. False if something is
+    /// still there at `timeout`. Without a cancel there is nothing to wait for.
+    @discardableResult
+    public func waitUntilTreeGone(timeout: TimeInterval = 10) -> Bool {
+        lock.lock()
+        let tree = doomed
+        lock.unlock()
+        let deadline = Date().addingTimeInterval(timeout)
+        while tree.contains(where: ProcessTree.isAlive) {
+            if Date() >= deadline { return false }
+            usleep(50_000)
+        }
+        return true
+    }
+
+    public var isPaused: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return paused
+    }
+
+    /// Stops the process and everything it started, where they are. Nothing is lost: output, files and the state of
+    /// the build stay as they are until `resume`. False when it is not running, already paused or cancelled.
+    ///
+    /// A long pause can still cost a tool that keeps its own clock (Xcode's build service, a network call): the time
+    /// spent paused counts for it.
+    @discardableResult
+    public func pause() -> Bool {
+        lock.lock()
+        guard process.isRunning, !paused, !cancelled else { lock.unlock(); return false }
+        paused = true
+        lock.unlock()
+        let stopped = ProcessTree.stop(rootedAt: process.processIdentifier)
+        lock.lock()
+        stoppedPIDs = stopped
+        lock.unlock()
+        return true
+    }
+
+    /// Lets a paused process, and everything it started, go on. False when it was not paused.
+    @discardableResult
+    public func resume() -> Bool {
+        lock.lock()
+        guard paused else { lock.unlock(); return false }
+        paused = false
+        let stopped = stoppedPIDs
+        stoppedPIDs = []
+        lock.unlock()
+        ProcessTree.resume(stopped)
+        return true
     }
 
     public var isRunning: Bool { process.isRunning }
+
+    /// The process's id, 0 until it has started.
+    public var processIdentifier: pid_t { process.isRunning ? process.processIdentifier : 0 }
 
     private func consume(_ data: Data) {
         lock.lock()

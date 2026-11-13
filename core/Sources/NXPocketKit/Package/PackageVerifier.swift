@@ -53,6 +53,11 @@ public enum PackageVerifier {
     public static func verify(_ folder: URL, options: VerifyOptions = .default,
                               fileManager: FileManager = .default,
                               progress: (Progress) -> Void = { _ in }) throws -> VerifiedPackage {
+        // A link as the package folder would send every walk below through it, and the files checked would not be
+        // the ones `rename` puts in the library: nothing in a package is a link, the folder itself included.
+        guard !PackageScanner.isSymbolicLink(folder) else {
+            throw NXPocketError(.symbolicLink, "symbolic links are refused", path: folder.lastPathComponent)
+        }
         let package = try loadPackage(folder, fileManager: fileManager)
         guard package.schema == GamePackage.currentSchema else {
             throw NXPocketError(.packageUnsupported,
@@ -67,6 +72,11 @@ public enum PackageVerifier {
 
         progress(Progress(fraction: 0.02, detail: "reading \(package.framework)"))
         let frameworkURL = folder.appendingPathComponent(package.framework, isDirectory: true)
+        // `fileExists` below follows a link and the scanner only refuses the links it meets *inside* the framework: the
+        // root is checked on its own, or a link to a folder elsewhere in Documents passes every test.
+        guard !PackageScanner.isSymbolicLink(frameworkURL) else {
+            throw NXPocketError(.symbolicLink, "symbolic links are refused", path: package.framework)
+        }
         var isDirectory: ObjCBool = false
         guard fileManager.fileExists(atPath: frameworkURL.path, isDirectory: &isDirectory), isDirectory.boolValue else {
             throw NXPocketError(.packageMissing, "\(package.framework) is not in the package", path: package.framework)
@@ -85,7 +95,10 @@ public enum PackageVerifier {
             guard SafePath.isSafeRelative(entry.path) else {
                 throw NXPocketError(.unsafePath, "the package lists \"\(entry.path)\"", path: name)
             }
-            guard entry.size >= 0, entry.sha256.isEmpty || FileDigest.isSHA256(entry.sha256) else {
+            // Every file is listed with its hash, and `docs/PACKAGE.md` says so: an entry with none used to pass and
+            // switch off the check of that very file, the one thing standing between a swapped executable and the
+            // app's own privileges.
+            guard entry.size >= 0, FileDigest.isSHA256(entry.sha256) else {
                 throw NXPocketError(.packageDamaged, "\"\(entry.path)\" has no valid sha256.", path: name)
             }
             guard listed.updateValue(entry, forKey: entry.path) == nil else {
@@ -126,7 +139,7 @@ public enum PackageVerifier {
             guard size == entry.size else {
                 throw NXPocketError(.sizeMismatch, "\"\(entry.path)\" is \(size) bytes, the package says \(entry.size)", path: entry.path)
             }
-            if options.verifyFileHashes, !entry.sha256.isEmpty {
+            if options.verifyFileHashes {
                 let digest = try FileDigest.sha256(ofFileAt: url)
                 guard digest == entry.sha256 else {
                     throw NXPocketError(.hashMismatch, "\"\(entry.path)\" does not match its sha256", path: entry.path)
@@ -150,11 +163,19 @@ public enum PackageVerifier {
         var romfsURL: URL?
         if package.romfsSize > 0 {
             let url = folder.appendingPathComponent(package.romfsPath)
+            guard !PackageScanner.isSymbolicLink(url) else {
+                throw NXPocketError(.symbolicLink, "symbolic links are refused", path: package.romfsPath)
+            }
             let size = (try? fileManager.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
             guard size == package.romfsSize else {
                 throw NXPocketError(.sizeMismatch, "\(package.romfsPath) is \(size) bytes, the package says \(package.romfsSize)", path: package.romfsPath)
             }
-            if options.verifyRomfsIdentity, let expected = RomfsIdentity.parse(package.romfsID) {
+            if options.verifyRomfsIdentity {
+                // An identity that cannot be read is a refusal, not a pass: with `if let` here a package declaring
+                // "garbage" (or nothing) skipped the only check that ties the image to the framework built for it.
+                guard let expected = RomfsIdentity.parse(package.romfsID) else {
+                    throw NXPocketError(.packageDamaged, "romfs_id \"\(package.romfsID)\" is not a RomFS identity", path: package.romfsPath)
+                }
                 progress(Progress(fraction: 0.8, detail: "checking \(package.romfsPath)"))
                 guard let actual = RomfsIdentity.ofImage(at: url) else {
                     throw NXPocketError(.packageDamaged, "\(package.romfsPath) is not a complete RomFS image", path: package.romfsPath)
@@ -170,6 +191,9 @@ public enum PackageVerifier {
         // there, and nothing may be there when it counts none (a rebuild without the add-ons once left the old ones).
         var aocURL: URL?
         let aoc = folder.appendingPathComponent(package.aocPath, isDirectory: true)
+        guard !PackageScanner.isSymbolicLink(aoc) else {
+            throw NXPocketError(.symbolicLink, "symbolic links are refused", path: package.aocPath)
+        }
         let aocBytes = fileManager.fileExists(atPath: aoc.path) ? try contentBytes(of: aoc, fileManager: fileManager) : nil
         if package.aocSize > 0 {
             guard let aocBytes else {

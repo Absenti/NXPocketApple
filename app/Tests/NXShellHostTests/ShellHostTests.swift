@@ -49,7 +49,7 @@ final class ImportServiceTests: XCTestCase {
     }
 
     private var identity: SigningIdentity {
-        SigningIdentity(identifier: "dev.nxpocket.app", teamID: "ABCDE12345",
+        SigningIdentity(identifier: "dev.nxpocketapple.app", teamID: "ABCDE12345",
                         certificateSHA256: String(repeating: "a", count: 64),
                         subject: "Apple Development: Test", expires: Date().addingTimeInterval(5 * 86400))
     }
@@ -159,13 +159,13 @@ final class GameRemovalTests: XCTestCase {
     }
 
     func testKeepsTheSaves() throws {
-        try GameRemoval.remove(game, saves: false)
+        try GameRemoval.remove(game, includingSaves: false)
         XCTAssertTrue(FileManager.default.fileExists(atPath: workspace.appendingPathComponent("games/0100111000200000/save/progress.dat").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: workspace.appendingPathComponent("games/0100111000200000/romfs.img").path))
     }
 
     func testRemovesTheSavesWhenAsked() throws {
-        try GameRemoval.remove(game, saves: true)
+        try GameRemoval.remove(game, includingSaves: true)
         XCTAssertFalse(FileManager.default.fileExists(atPath: workspace.appendingPathComponent("games/0100111000200000").path))
     }
 

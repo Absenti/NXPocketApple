@@ -17,10 +17,13 @@ public struct EngineBuildRequest: Sendable {
     /// Whether the files given hold DLC. The engine's `aoc/` stays from an earlier run when this one has none, so
     /// it is packed only when this run made it.
     public var includesDLC: Bool
+    /// The version this run builds (`BuildPlan.packageVersion`, else `version`): the engine extracts it to
+    /// `extract/v<N>/` and the launcher falls back on that image when the engine's own line cannot be read.
+    public var expectedVersion: UInt32?
 
     public init(gameFolder: URL, keysFile: URL? = nil, titleID: String? = nil, packageVersion: String? = nil,
                 language: String? = nil, keepExtracted: Bool = true, allowOtherMetal: Bool = false,
-                stagingFolder: URL, workFolder: URL? = nil, includesDLC: Bool = true) {
+                stagingFolder: URL, workFolder: URL? = nil, includesDLC: Bool = true, expectedVersion: UInt32? = nil) {
         self.gameFolder = gameFolder
         self.keysFile = keysFile
         self.titleID = titleID
@@ -31,6 +34,7 @@ public struct EngineBuildRequest: Sendable {
         self.stagingFolder = stagingFolder
         self.workFolder = workFolder
         self.includesDLC = includesDLC
+        self.expectedVersion = expectedVersion
     }
 }
 
@@ -249,7 +253,10 @@ public final class EngineBuilder: @unchecked Sendable {
             throw NXPocketError(.engineFailed, "the engine produced no framework in \(request.stagingFolder.path)")
         }
         let manifest = try GameManifest.decode(try BoundedRead.data(at: framework.appendingPathComponent(GameManifest.fileName)))
-        guard let image = reportedRomfs else {
+        // The engine's own line names the image. When it cannot be read (the engine changed how it words it) the image of
+        // the very version this run built is taken, `extract/v<N>/RomFS.img`: a fixed place for a fixed version, never "the
+        // newest image found", which could be another version's and be packed without a word.
+        guard let image = reportedRomfs ?? Self.extractedImage(for: request) else {
             throw NXPocketError(.engineFailed, "the engine did not name the game's RomFS image (its \"game files:\" line)")
         }
         guard FileManager.default.fileExists(atPath: image.path) else {
@@ -259,10 +266,31 @@ public final class EngineBuilder: @unchecked Sendable {
                                  aocFolder: request.includesDLC ? Self.addOnFolder(romfsImage: image, workFolder: request.workFolder) : nil)
     }
 
+    /// `<build folder>/extract/v<N>/RomFS.img` for the version the request builds, when it is there.
+    static func extractedImage(for request: EngineBuildRequest, fileManager: FileManager = .default) -> URL? {
+        guard let work = request.workFolder, let version = request.expectedVersion else { return nil }
+        let image = work.appendingPathComponent("extract/v\(version)/RomFS.img")
+        return fileManager.fileExists(atPath: image.path) ? image : nil
+    }
+
+    /// What the engine's `say` puts before every message: the time, `[21:05:47] `. A line is read without it, or
+    /// `game files:` and `[RED]` are never at the start of one: that is how every build ended in "the engine did not name
+    /// the game's RomFS image", after the whole build.
+    public static func withoutClock(_ message: String) -> String {
+        let trimmed = message.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("["), let close = trimmed.firstIndex(of: "]") else { return trimmed }
+        let fields = trimmed[trimmed.index(after: trimmed.startIndex)..<close].split(separator: ":", omittingEmptySubsequences: false)
+        guard fields.count == 3, fields.allSatisfy({ $0.count == 2 && $0.allSatisfy(\.isASCII) && $0.allSatisfy(\.isNumber) }) else {
+            return trimmed
+        }
+        return trimmed[trimmed.index(after: close)...].trimmingCharacters(in: .whitespaces)
+    }
+
     /// The RomFS image in the engine's `game files: <path>` line, which names the version it packed: with several
     /// versions extracted, the newest file is not always the one built.
     public static func romfsImage(inMessage message: String) -> URL? {
         let prefix = "game files: "
+        let message = withoutClock(message)
         guard message.hasPrefix(prefix) else { return nil }
         let path = String(message.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
         guard path.hasPrefix("/"), path.lowercased().hasSuffix(".img") else { return nil }

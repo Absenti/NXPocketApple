@@ -77,12 +77,12 @@ public enum UpdateCheckOutcome: Equatable, Sendable {
 /// The launcher's own updates, from the project's GitHub releases. Nothing personal is sent: one unauthenticated GET
 /// with the User-Agent GitHub requires, then the release's own files.
 public enum LauncherUpdate {
-    public static let repository = "Absenti/iPorterNX"
+    public static let repository = "Absenti/NXPocketApple"
     public static let latestURL = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
     public static let releasesPage = URL(string: "https://github.com/\(repository)/releases")!
-    public static let userAgent = "iPorterNX-Launcher"
+    public static let userAgent = "NXPocketApple-Launcher"
     public static let bundleID = "dev.nxpocket.launcher"
-    public static let zipName = "iPorterNX-macOS.zip"
+    public static let zipName = "NXPocketApple-macOS.zip"
     public static let sumsName = "SHA256SUMS"
 
     /// The running launcher's version, nil for a build that is not a bundle (the plain `swift build` executable).
@@ -93,6 +93,12 @@ public enum LauncherUpdate {
     // MARK: - Checking
 
     public static func latest(current: SemanticVersion?) async -> UpdateCheckOutcome {
+        await latestWithRelease(current: current).outcome
+    }
+
+    /// The same look, also giving the latest published release itself (when there is one): the launcher's update and
+    /// the iPhone app's IPA both come from it, so it is asked for once.
+    public static func latestWithRelease(current: SemanticVersion?) async -> (outcome: UpdateCheckOutcome, release: LauncherRelease?) {
         var request = URLRequest(url: latestURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -100,10 +106,17 @@ public enum LauncherUpdate {
         defer { session.finishTasksAndInvalidate() }
         do {
             let (data, response) = try await session.data(for: request)
-            return outcome(status: (response as? HTTPURLResponse)?.statusCode ?? 0, data: data, current: current)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let release = status == 200 ? (try? parse(data)).flatMap { stable($0) ? $0 : nil } : nil
+            return (outcome(status: status, data: data, current: current), release)
         } catch {
-            return .failed("GitHub could not be reached: \(error.localizedDescription)")
+            return (.failed("GitHub could not be reached: \(error.localizedDescription)"), nil)
         }
+    }
+
+    /// A release people are meant to install: not a draft, not a pre-release.
+    static func stable(_ release: LauncherRelease) -> Bool {
+        !release.isDraft && !release.isPrerelease && !release.version.isPrerelease
     }
 
     /// What an answer of `releases/latest` means for the running version.
@@ -173,7 +186,7 @@ public enum LauncherUpdate {
             return "This launcher is a development build (\(path)): download the release from its page."
         }
         if path.contains("/AppTranslocation/") {
-            return "macOS runs this launcher from a read-only copy. Move iPorterNX.app to Applications, open it from there, then update."
+            return "macOS runs this launcher from a read-only copy. Move NXPocketApple.app to Applications, open it from there, then update."
         }
         let parent = bundle.deletingLastPathComponent().path
         guard fileManager.isWritableFile(atPath: parent), fileManager.isWritableFile(atPath: bundle.path) else {
@@ -248,7 +261,7 @@ public enum LauncherUpdate {
                                   opener: String = "/usr/bin/open") -> String {
         """
         #!/bin/sh
-        # Written by the iPorterNX launcher to replace itself once it has quit.
+        # Written by the NXPocketApple launcher to replace itself once it has quit.
         OLD=\(quote(app.path))
         NEW=\(quote(newApp.path))
         TRASHED=\(quote(trashed.path))
@@ -281,7 +294,7 @@ public enum LauncherUpdate {
     public static func trashDestination(for app: URL, version: SemanticVersion?, fileManager: FileManager = .default) throws -> URL {
         let trash = try fileManager.url(for: .trashDirectory, in: .userDomainMask, appropriateFor: app, create: true)
         let stamp = Int(Date().timeIntervalSince1970)
-        return trash.appendingPathComponent("iPorterNX \(version?.description ?? "old") \(stamp).app", isDirectory: true)
+        return trash.appendingPathComponent("NXPocketApple \(version?.description ?? "old") \(stamp).app", isDirectory: true)
     }
 
     /// Writes the swap script and starts it; the caller quits right after. The script outlives this process.

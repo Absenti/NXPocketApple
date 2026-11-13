@@ -41,6 +41,8 @@ public final class AppModel: ObservableObject {
     /// The last lines of the engine, the scripts and the launcher itself, each with a number that stays its own.
     @Published public internal(set) var log: [LogLine] = []
     var logCount = 0
+    /// What the window's log shows, kept on disk too (`LauncherLog`): the window holds 800 lines and forgets them at quit.
+    public let fileLog = LauncherLog()
     @Published public internal(set) var engineReport = "not checked"
     /// What the chosen Python lacks, in words, or nil when it has everything the engine imports.
     @Published public internal(set) var pythonProblem: String?
@@ -96,6 +98,12 @@ public final class AppModel: ObservableObject {
     // MARK: The launcher's own updates (AppModel+Update)
 
     @Published public internal(set) var update: UpdateState = .idle
+    /// Whether the sheet that offers a new release is open: it opens by itself when the look at launch finds one.
+    @Published public var showUpdateSheet = false
+    /// The latest published release, from the last look at GitHub: the launcher's update and the iPhone app's IPA.
+    @Published public internal(set) var latestRelease: LauncherRelease?
+    /// The IPA being downloaded from that release.
+    @Published public internal(set) var ipaDownload: TaskState = .idle
     /// Where each copy sent to iCloud Drive for the iPhone stands, by backup folder path.
     @Published public internal(set) var saveExports: [String: CloudCopyState] = [:]
     /// What the phone's saves looked like at the last look, to copy the changed ones (`backUpChanged`).
@@ -110,8 +118,9 @@ public final class AppModel: ObservableObject {
     @Published public internal(set) var newestAppSource: Date?
     @Published public internal(set) var appBuild: TaskState = .idle
     @Published public internal(set) var memoryHelper: TaskState = .idle
-    /// The App ID and team the RAM helper would sign for, read from the phone, or why they could not be.
-    @Published public internal(set) var memoryTarget: Result<MemoryLimitHelper.Target, NXPocketError>?
+    /// How the app is installed on the selected phone, read from it, or why that could not be told. The RAM helper
+    /// needs a team-signed App ID (SideStore, AltStore); any other store is a normal installation, not an error.
+    @Published public internal(set) var installation: Result<MemoryLimitHelper.Installation, NXPocketError>?
     var appBuildRunner: ProcessRunner?
     /// The IPA's copy in iCloud Drive → Downloads, where SideStore's + finds it on the iPhone.
     @Published public internal(set) var cloudCopy: CloudCopyState = .none
@@ -144,11 +153,16 @@ public final class AppModel: ObservableObject {
 
     public init(settings: SettingsStore? = nil) {
         self.settings = settings ?? SettingsStore()
+        // A build paused when the launcher quits must not stay stopped with nobody to wake it.
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { _ = self?.runner?.resume() }
+        }
         refreshToolchain()
         refreshLibrary()
         refreshFolder()
         refreshBackups()
-        refreshPhoneApp()
+        // The IPA that came inside the app is put in place first, then read: two tasks would race on `phoneIPA`.
+        if PhoneAppDownload.bundledIPA() != nil { seedPhoneAppFromBundle() } else { refreshPhoneApp() }
         checkForUpdatesAtLaunch()
     }
 
@@ -388,6 +402,7 @@ public final class AppModel: ObservableObject {
 
     func append(_ line: String) {
         guard !line.isEmpty else { return }
+        fileLog.append(line)
         logCount += 1
         log.append(LogLine(id: logCount, text: line))
         if log.count > 800 { log.removeFirst(log.count - 800) }

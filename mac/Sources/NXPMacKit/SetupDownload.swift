@@ -19,11 +19,13 @@ public enum SetupDownload {
 
     /// A download whose hash is checked by the caller (the launcher's update checks it against the release's
     /// SHA256SUMS). Only the User-Agent is sent with it: no token, nothing about the user.
-    static func fetch(_ url: URL, to destination: URL, userAgent: String, progress: @escaping Progress) throws {
+    /// `maxBytes`, when given, stops a download that announces or reaches more than that: nothing larger is ever written.
+    static func fetch(_ url: URL, to destination: URL, userAgent: String, maxBytes: Int64? = nil,
+                      progress: @escaping Progress) throws {
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? fileManager.removeItem(at: destination)
-        try Fetcher(destination: destination, progress: progress, userAgent: userAgent).run(url)
+        try Fetcher(destination: destination, progress: progress, userAgent: userAgent, maxBytes: maxBytes).run(url)
     }
 
     public static func verify(_ file: URL, against download: SetupPins.Download) throws {
@@ -41,13 +43,15 @@ public enum SetupDownload {
         let destination: URL
         let progress: Progress
         let userAgent: String?
+        let maxBytes: Int64?
         private let done = DispatchSemaphore(value: 0)
         private var failure: Error?
 
-        init(destination: URL, progress: @escaping Progress, userAgent: String? = nil) {
+        init(destination: URL, progress: @escaping Progress, userAgent: String? = nil, maxBytes: Int64? = nil) {
             self.destination = destination
             self.progress = progress
             self.userAgent = userAgent
+            self.maxBytes = maxBytes
         }
 
         func run(_ url: URL) throws {
@@ -63,6 +67,11 @@ public enum SetupDownload {
 
         func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
                         totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+            if let maxBytes, totalBytesWritten > maxBytes || totalBytesExpectedToWrite > maxBytes, failure == nil {
+                failure = NXPocketError(.transferFailed, "the file is larger than the \(ByteCountFormatter.string(fromByteCount: maxBytes, countStyle: .file)) expected: stopped")
+                downloadTask.cancel()
+                return
+            }
             progress(totalBytesWritten, max(totalBytesExpectedToWrite, 0))
         }
 

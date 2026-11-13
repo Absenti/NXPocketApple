@@ -7,9 +7,15 @@ public struct LauncherSettings: Codable, Equatable, Sendable {
     public var keysFile: String = ""
     public var outputFolder: String = ""
     public var gameFolder: String = ""
-    public var bundleID: String = "dev.nxpocket.app"
+    public var bundleID: String = "dev.nxpocketapple.app"
     public var language: String = ""
+    /// Kept for the saved settings of earlier versions. It does nothing since the launcher builds only a game's framework
+    /// (`--shell-framework`), which makes the engine keep the extraction whatever this says: the launcher needs the RomFS
+    /// image there to pack it. `removeDecompressed` is the setting that frees space.
     public var keepExtracted: Bool = true
+    /// Whether the `.nsp` / `.xci` the engine decompresses a `.nsz` / `.xcz` into (`<title ID>_build/nsp/`, as large as the
+    /// game) is removed once the build is packed. The dump itself and the build are never touched (`DecompressedCopies`).
+    public var removeDecompressed: Bool = true
     public var allowOtherMetal: Bool = false
     public var deleteSource: Bool = false
     public var xcodePath: String = ""
@@ -38,7 +44,7 @@ public struct LauncherSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case engineRoot, keysFile, outputFolder, gameFolder, bundleID, language, keepExtracted, allowOtherMetal
         case deleteSource, xcodePath, deviceUDID, pythonPath, sendAfterBuild, autoBackup, gameNames, originalGameNames
-        case workFolder, checkUpdates, lastUpdateCheck
+        case workFolder, checkUpdates, lastUpdateCheck, removeDecompressed
     }
 
     /// Every field is optional on the way in: the synthesised decoder requires them all, so adding one would have
@@ -52,8 +58,12 @@ public struct LauncherSettings: Codable, Equatable, Sendable {
         outputFolder = try container.decodeIfPresent(String.self, forKey: .outputFolder) ?? defaults.outputFolder
         gameFolder = try container.decodeIfPresent(String.self, forKey: .gameFolder) ?? defaults.gameFolder
         bundleID = try container.decodeIfPresent(String.self, forKey: .bundleID) ?? defaults.bundleID
+        // The app was renamed NXPocketApple and its identifier went from dev.nxpocket.app to dev.nxpocketapple.app: a
+        // launcher that saved the old one would keep sending to an app that is no longer installed.
+        if bundleID == LauncherSettings.previousBundleID { bundleID = LauncherSettings.defaultBundleID }
         language = try container.decodeIfPresent(String.self, forKey: .language) ?? defaults.language
         keepExtracted = try container.decodeIfPresent(Bool.self, forKey: .keepExtracted) ?? defaults.keepExtracted
+        removeDecompressed = try container.decodeIfPresent(Bool.self, forKey: .removeDecompressed) ?? defaults.removeDecompressed
         allowOtherMetal = try container.decodeIfPresent(Bool.self, forKey: .allowOtherMetal) ?? defaults.allowOtherMetal
         deleteSource = try container.decodeIfPresent(Bool.self, forKey: .deleteSource) ?? defaults.deleteSource
         xcodePath = try container.decodeIfPresent(String.self, forKey: .xcodePath) ?? defaults.xcodePath
@@ -72,7 +82,9 @@ public struct LauncherSettings: Codable, Equatable, Sendable {
         pythonPath.isEmpty ? nil : URL(fileURLWithPath: (pythonPath as NSString).expandingTildeInPath)
     }
 
-    public static let defaultBundleID = "dev.nxpocket.app"
+    public static let defaultBundleID = "dev.nxpocketapple.app"
+    /// The identifier before the rename, replaced by the default when a saved setting still holds it.
+    static let previousBundleID = "dev.nxpocket.app"
 
     public static var defaultOutputFolder: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/NXPocket", isDirectory: true)

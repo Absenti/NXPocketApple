@@ -83,12 +83,15 @@ public enum CertificateImporter {
             }
             throw NXPocketError(.noCertificate, "the .p12 could not be read (status \(status))")
         }
+        // Checked by its Core Foundation type: a CF object cannot be tested with `as?` (it always succeeds), and a
+        // forced cast on what a user-chosen file decodes to would trap the app on a malformed .p12.
         guard let array = items as? [[String: Any]],
               let first = array.first,
-              let identityItem = first[kSecImportItemIdentity as String] else {
+              let identityItem = first[kSecImportItemIdentity as String],
+              CFGetTypeID(identityItem as CFTypeRef) == SecIdentityGetTypeID() else {
             throw NXPocketError(.noCertificate, "the .p12 holds no identity")
         }
-        let identity = identityItem as! SecIdentity
+        let identity = unsafeDowncast(identityItem as AnyObject, to: SecIdentity.self)
         var certificateRef: SecCertificate?
         guard SecIdentityCopyCertificate(identity, &certificateRef) == errSecSuccess, let certificateRef else {
             throw NXPocketError(.noCertificate, "the .p12's identity has no certificate")

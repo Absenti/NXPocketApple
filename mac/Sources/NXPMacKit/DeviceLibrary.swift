@@ -38,7 +38,7 @@ public struct PhoneSnapshot: Sendable {
 
 /// What the paired iPhone has in `Documents/games/`: one recursive listing (about a second over the cable or Wi-Fi),
 /// then each `package.json` copied back, only when its size or date changed since the last look. A transfer still
-/// waiting in `.incoming` is not counted: it is on the phone once iPorterNX there has imported it.
+/// waiting in `.incoming` is not counted: it is on the phone once NXPocketApple there has imported it.
 ///
 /// Everything here reads: `devicectl device info files` and `devicectl device copy from`, never with
 /// `--remove-existing-content` (`readArguments`). The Mac writes on the phone only through `DeviceTransfer`, into
@@ -65,7 +65,7 @@ public final class DeviceLibrary: @unchecked Sendable {
         do {
             files = try listGames(on: device, bundleID: bundleID)
         } catch {
-            // iPorterNX may have been installed again under another bundle ID (SideStore appends its team, a new
+            // NXPocketApple may have been installed again under another bundle ID (SideStore appends its team, a new
             // install can bring another): the next look asks the phone again instead of keeping a gone one.
             forgetBundleID(on: device, configured: configured)
             throw error
@@ -103,7 +103,7 @@ public final class DeviceLibrary: @unchecked Sendable {
 
     /// The listing of `Documents/games`, asked twice: over Wi-Fi devicectl now and then fails a call that works a
     /// second later, and an empty answer would have said "no game on the iPhone". A folder that does not exist fails
-    /// the same way (iPorterNX makes it at its first start, so after a reinstall it is missing until the app opens):
+    /// the same way (NXPocketApple makes it at its first start, so after a reinstall it is missing until the app opens):
     /// then `Documents` is listed, and a listing without `games` means no game, not a failure.
     private func listGames(on device: Device, bundleID: String) throws -> [RemoteFile] {
         var lastLine = "devicectl could not list the iPhone's games"

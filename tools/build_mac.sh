@@ -7,7 +7,7 @@
 # The check fails the build if that drifts back.
 #
 # Usage: tools/build_mac.sh                    build, then check
-#        tools/build_mac.sh --app              the same, then mac/.build/iPorterNX.app around it (ad hoc signed)
+#        tools/build_mac.sh --app              the same, then mac/.build/NXPocketApple.app around it (ad hoc signed)
 #        tools/build_mac.sh --check <binary>   only the check
 #
 # The .app: bundle ID dev.nxpocket.launcher, CFBundleShortVersionString from VERSION at the repository root (a
@@ -57,14 +57,14 @@ BUILD=${BUILD_NUMBER:-1}
 MINOS=$(otool -l "$BINARY" | awk '/cmd LC_BUILD_VERSION/ { f = 1 } f && $1 == "minos" { print $2; exit }')
 [ -n "$MINOS" ] || die "$BINARY records no minimum macOS"
 
-APP=$ROOT/mac/.build/iPorterNX.app
+APP=$ROOT/mac/.build/NXPocketApple.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINARY" "$APP/Contents/MacOS/NXPocket"
 
 ICON_KEY=""
 ICNS=$ROOT/mac/Resources/AppIcon.icns
-SOURCE_PNG=$ROOT/app/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png
+SOURCE_PNG=$ROOT/mac/Resources/AppIcon-1024.png
 if [ -f "$ICNS" ]; then
     cp "$ICNS" "$APP/Contents/Resources/AppIcon.icns"
 elif [ -f "$SOURCE_PNG" ]; then
@@ -78,6 +78,22 @@ elif [ -f "$SOURCE_PNG" ]; then
 fi
 [ -f "$APP/Contents/Resources/AppIcon.icns" ] && ICON_KEY="<key>CFBundleIconFile</key><string>AppIcon</string>"
 
+# The iPhone app's IPA rides inside the launcher, so the iPhone app screen has it before any release is downloaded: the
+# one from NXPOCKET_BUNDLE_IPA, else the one tools/build_app.sh left in the output folder. Only if it is NXPocketApple.
+BUNDLED_IPA=${NXPOCKET_BUNDLE_IPA:-${NXPOCKET_OUTPUT:-$HOME/Documents/NXPocket}/NXPocketApple.ipa}
+if [ -f "$BUNDLED_IPA" ]; then
+    IPA_ID=$(unzip -p "$BUNDLED_IPA" 'Payload/*.app/Info.plist' 2>/dev/null | plutil -extract CFBundleIdentifier raw -o - - 2>/dev/null || true)
+    IPA_VERSION=$(unzip -p "$BUNDLED_IPA" 'Payload/*.app/Info.plist' 2>/dev/null | plutil -extract CFBundleShortVersionString raw -o - - 2>/dev/null || true)
+    if [ "$IPA_ID" != dev.nxpocketapple.app ]; then
+        echo "iphone:   $BUNDLED_IPA is \"${IPA_ID:-not an IPA}\", not dev.nxpocketapple.app: left out"
+    elif [ "$IPA_VERSION" != "$VERSION" ]; then
+        echo "iphone:   $BUNDLED_IPA is version ${IPA_VERSION:-?}, this launcher is $VERSION: left out (build the iPhone app again)"
+    else
+        cp "$BUNDLED_IPA" "$APP/Contents/Resources/NXPocketApple.ipa"
+        echo "iphone:   $BUNDLED_IPA is inside the app"
+    fi
+fi
+
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -85,8 +101,8 @@ cat > "$APP/Contents/Info.plist" <<EOF
 <dict>
     <key>CFBundleExecutable</key><string>NXPocket</string>
     <key>CFBundleIdentifier</key><string>dev.nxpocket.launcher</string>
-    <key>CFBundleName</key><string>iPorterNX</string>
-    <key>CFBundleDisplayName</key><string>iPorterNX</string>
+    <key>CFBundleName</key><string>NXPocketApple</string>
+    <key>CFBundleDisplayName</key><string>NXPocketApple</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>

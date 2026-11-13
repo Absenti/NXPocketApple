@@ -25,7 +25,7 @@ final class SaveWatchTests: XCTestCase {
         ]
         let games = [PhoneGame(titleID: titleID, name: "South Park", version: "1.0", packageVersion: "v0"),
                      PhoneGame(titleID: "010051F0207B2000", name: "No saves yet", version: "1.0", packageVersion: "v0")]
-        return PhoneSnapshot(deviceUDID: "X", bundleID: "dev.nxpocket.app.X", games: games, files: files)
+        return PhoneSnapshot(deviceUDID: "X", bundleID: "dev.nxpocketapple.app.X", games: games, files: files)
     }
 
     private func summary(of snapshot: PhoneSnapshot) -> String {
@@ -99,7 +99,7 @@ final class SaveWatchTests: XCTestCase {
         let output = URL(fileURLWithPath: folder, isDirectory: true)
         let toolchain = ToolchainLocator.detect(engineRoot: nil)
         let device = try XCTUnwrap(try DeviceInventory.list(toolchain: toolchain).first { !$0.isSimulator && $0.canReceive })
-        let snapshot = try DeviceLibrary(toolchain: toolchain).snapshot(on: device, bundleID: "dev.nxpocket.app")
+        let snapshot = try DeviceLibrary(toolchain: toolchain).snapshot(on: device, bundleID: "dev.nxpocketapple.app")
         print("phone: \(snapshot.bundleID), \(snapshot.games.count) game(s), \(snapshot.files.count) entries")
         for game in snapshot.games {
             let saves = snapshot.saveFiles(of: game.titleID).filter { !$0.isDirectory }

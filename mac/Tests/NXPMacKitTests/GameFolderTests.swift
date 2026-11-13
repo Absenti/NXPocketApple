@@ -218,7 +218,7 @@ final class GameFolderTests: XCTestCase {
     // MARK: - Settings and messages
 
     func testSettingsSavedBeforeTheNewFieldsStillDecode() throws {
-        let old = #"{"keysFile":"/k/prod.keys","bundleID":"dev.nxpocket.app","language":"","keepExtracted":true,"allowOtherMetal":false,"deleteSource":false,"gameFolder":"/games","engineRoot":"","deviceUDID":"","outputFolder":"","xcodePath":""}"#
+        let old = #"{"keysFile":"/k/prod.keys","bundleID":"dev.nxpocketapple.app","language":"","keepExtracted":true,"allowOtherMetal":false,"deleteSource":false,"gameFolder":"/games","engineRoot":"","deviceUDID":"","outputFolder":"","xcodePath":""}"#
         let settings = try JSONDecoder().decode(LauncherSettings.self, from: Data(old.utf8))
         XCTAssertEqual(settings.keysFile, "/k/prod.keys")
         XCTAssertEqual(settings.gameFolder, "/games")
@@ -232,21 +232,27 @@ final class GameFolderTests: XCTestCase {
         XCTAssertNil(AppModel.engineError(in: "ok extract"))
     }
 
+    func testTheEnginesRedLineIsFoundBehindItsClock() {
+        XCTAssertEqual(AppModel.engineError(in: "[23:23:26] [RED] more than one game in the folder: A, B"),
+                       "more than one game in the folder: A, B")
+        XCTAssertNil(AppModel.engineError(in: "[23:23:26] game files: /g/RomFS.img"))
+    }
+
     // MARK: - The app's ID on the phone
 
     func testSendsToTheSuffixedIDSideStoreInstalled() throws {
-        XCTAssertEqual(try DeviceTransfer.resolve("dev.nxpocket.app", among: ["com.other", "dev.nxpocket.app.ABCDE12345"],
-                                                  device: "iPhone"), "dev.nxpocket.app.ABCDE12345")
-        XCTAssertEqual(try DeviceTransfer.resolve("dev.nxpocket.app", among: ["dev.nxpocket.app", "dev.nxpocket.app.X"],
-                                                  device: "iPhone"), "dev.nxpocket.app")
-        XCTAssertThrowsError(try DeviceTransfer.resolve("dev.nxpocket.app", among: ["com.other"], device: "iPhone"))
-        XCTAssertThrowsError(try DeviceTransfer.resolve("dev.nxpocket.app", among: ["dev.nxpocket.app.A", "dev.nxpocket.app.B"],
+        XCTAssertEqual(try DeviceTransfer.resolve("dev.nxpocketapple.app", among: ["com.other", "dev.nxpocketapple.app.ABCDE12345"],
+                                                  device: "iPhone"), "dev.nxpocketapple.app.ABCDE12345")
+        XCTAssertEqual(try DeviceTransfer.resolve("dev.nxpocketapple.app", among: ["dev.nxpocketapple.app", "dev.nxpocketapple.app.X"],
+                                                  device: "iPhone"), "dev.nxpocketapple.app")
+        XCTAssertThrowsError(try DeviceTransfer.resolve("dev.nxpocketapple.app", among: ["com.other"], device: "iPhone"))
+        XCTAssertThrowsError(try DeviceTransfer.resolve("dev.nxpocketapple.app", among: ["dev.nxpocketapple.app.A", "dev.nxpocketapple.app.B"],
                                                         device: "iPhone"))
     }
 
     func testReadsDevicectlsAppListing() {
-        let json = #"{"result":{"apps":[{"bundleIdentifier":"dev.nxpocket.app.ABCDE12345","name":"iPorterNX"},{"name":"x"}]}}"#
-        XCTAssertEqual(DeviceTransfer.bundleIDs(inAppsListing: Data(json.utf8)), ["dev.nxpocket.app.ABCDE12345"])
+        let json = #"{"result":{"apps":[{"bundleIdentifier":"dev.nxpocketapple.app.ABCDE12345","name":"NXPocketApple"},{"name":"x"}]}}"#
+        XCTAssertEqual(DeviceTransfer.bundleIDs(inAppsListing: Data(json.utf8)), ["dev.nxpocketapple.app.ABCDE12345"])
     }
 }
 
@@ -269,7 +275,7 @@ final class TransferFailureTests: XCTestCase {
     /// it wiped the iPhone's games and saves on every failed send until 2026-11-11. No copy may carry it.
     func testNoCopyEverEmptiesSomethingOnThePhone() throws {
         let arguments = DeviceTransfer.copyArguments(source: URL(fileURLWithPath: "/tmp/.abandoned"), device: phone,
-                                                     bundleID: "dev.nxpocket.app.X", destination: ".incoming/ABC/.abandoned")
+                                                     bundleID: "dev.nxpocketapple.app.X", destination: ".incoming/ABC/.abandoned")
         XCTAssertEqual(Array(arguments.prefix(4)), ["devicectl", "device", "copy", "to"])
         XCTAssertTrue(arguments.contains("Documents/.incoming/ABC/.abandoned"))
         XCTAssertFalse(arguments.contains("--remove-existing-content"))
@@ -286,7 +292,7 @@ final class TransferFailureTests: XCTestCase {
         let cause = NXPocketError(.transferFailed, "the device was disconnected")
         let marked = DeviceTransfer.failure(cause, partialCopyMarked: true)
         XCTAssertEqual(marked.code, .transferFailed)
-        XCTAssertEqual(marked.detail, "the device was disconnected (iPorterNX on the iPhone deletes the part already sent when it next opens)")
+        XCTAssertEqual(marked.detail, "the device was disconnected (NXPocketApple on the iPhone deletes the part already sent when it next opens)")
         let left = DeviceTransfer.failure(cause, partialCopyMarked: false)
         XCTAssertTrue(left.detail.hasPrefix("the device was disconnected (the part already sent is still on the iPhone"))
         XCTAssertTrue(left.detail.contains("10 minutes"), left.detail)

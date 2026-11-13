@@ -27,6 +27,9 @@ DerivedData/
 prod.keys
 *.nxgame
 
+# Claude Code's worktrees: full copies of the repository, builds included
+.claude/
+
 # Xcode and macOS noise
 .DS_Store
 xcuserdata/

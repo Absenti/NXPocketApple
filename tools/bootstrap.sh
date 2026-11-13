@@ -54,7 +54,7 @@ say "done"
 cat <<EOF
 
 Next:
-  tools/build_mac.sh                  build the launcher (mac/iPorterNX)
+  tools/build_mac.sh                  build the launcher (mac/NXPocketApple)
   tools/build_app.sh --sim            build the iPhone app for the simulator
   tools/build_app.sh --device-unsigned   produce an unsigned IPA for SideStore
 

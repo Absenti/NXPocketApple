@@ -1,7 +1,7 @@
 # The engine
 
 The engine is nxnative, through NX2Apple. It is a separate project with its own licence and its own release cycle;
-iPorterNX drives it and never modifies it in place.
+NXPocketApple drives it and never modifies it in place.
 
 ## On the Mac: it builds each game
 

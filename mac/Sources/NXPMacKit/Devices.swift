@@ -131,7 +131,7 @@ public final class DeviceTransfer: @unchecked Sendable {
             try copy(marker(), to: device, bundleID: bundleID, destination: "\(incoming)/\(GameLayout.completeMarker)",
                      control: control)
         } catch {
-            // What already reached the phone is gigabytes that will never be imported: it is marked for iPorterNX
+            // What already reached the phone is gigabytes that will never be imported: it is marked for NXPocketApple
             // there to delete before the failure is reported.
             let marked = abandon(incoming, on: device, bundleID: bundleID)
             throw Self.failure(error, partialCopyMarked: marked)
@@ -162,7 +162,7 @@ public final class DeviceTransfer: @unchecked Sendable {
         }
     }
 
-    /// Leaves `.abandoned` in a transfer folder on the phone. iPorterNX there deletes such a folder, with everything
+    /// Leaves `.abandoned` in a transfer folder on the phone. NXPocketApple there deletes such a folder, with everything
     /// it holds, as soon as it looks (`GameImporter.cleanStaleIncoming`), and one that never got the marker after
     /// `GameLayout.incomingIdleLimit` without activity.
     ///
@@ -188,8 +188,8 @@ public final class DeviceTransfer: @unchecked Sendable {
         let cause = error as? NXPocketError ?? NXPocketError(.transferFailed, error.localizedDescription)
         let minutes = Int(GameLayout.incomingIdleLimit / 60)
         let aftermath = partialCopyMarked
-            ? "iPorterNX on the iPhone deletes the part already sent when it next opens"
-            : "the part already sent is still on the iPhone: iPorterNX removes it after \(minutes) minutes without activity"
+            ? "NXPocketApple on the iPhone deletes the part already sent when it next opens"
+            : "the part already sent is still on the iPhone: NXPocketApple removes it after \(minutes) minutes without activity"
         return NXPocketError(cause.code, "\(cause.detail) (\(aftermath))", path: cause.path)
     }
 
@@ -302,7 +302,7 @@ public final class DeviceTransfer: @unchecked Sendable {
     }
 
     /// The bundle ID the app is installed under. SideStore and AltStore append the team to it
-    /// (`dev.nxpocket.app.ABCDE12345`), so the plain one names no app on the phone and devicectl refuses the copy.
+    /// (`dev.nxpocketapple.app.ABCDE12345`), so the plain one names no app on the phone and devicectl refuses the copy.
     /// The exact one wins; otherwise the single installed app whose ID is it plus a suffix.
     public func installedBundleID(on device: Device, matching bundleID: String) throws -> String {
         let listing = fileManager.temporaryDirectory.appendingPathComponent("nxpocket-apps-\(UUID().uuidString).json")
@@ -330,9 +330,9 @@ public final class DeviceTransfer: @unchecked Sendable {
         let suffixed = installed.filter { $0.hasPrefix(bundleID + ".") }
         if suffixed.count == 1 { return suffixed[0] }
         if suffixed.isEmpty {
-            throw NXPocketError(.transferFailed, "iPorterNX (\(bundleID)) is not installed on \(device)")
+            throw NXPocketError(.transferFailed, "NXPocketApple (\(bundleID)) is not installed on \(device)")
         }
-        throw NXPocketError(.transferFailed, "\(device) has several copies of iPorterNX (\(suffixed.joined(separator: ", "))): "
+        throw NXPocketError(.transferFailed, "\(device) has several copies of NXPocketApple (\(suffixed.joined(separator: ", "))): "
                                 + "set the one to send to in Settings → iPhone app bundle ID")
     }
 

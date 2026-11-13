@@ -14,9 +14,13 @@ public enum AppSignature {
     /// The entitlements the installer signed into the executable itself, which are what the system enforces.
     static let entitlements: [String: Any]? = image.flatMap(SignatureEntitlements.read)
 
+    /// The same entitlements as the XML plist the installer wrote, byte for byte: what a game's signature copies
+    /// when it is to agree with the app exactly (`DeviceSigner.Entitlements.appSigned`).
+    static let entitlementsXML: Data? = image.flatMap(SignatureEntitlements.readXML)
+
     public static var currentIdentifier: String {
         guard let signature, !signature.identifier.isEmpty else {
-            return Bundle.main.bundleIdentifier ?? "dev.nxpocket.app"
+            return Bundle.main.bundleIdentifier ?? "dev.nxpocketapple.app"
         }
         return signature.identifier
     }
@@ -36,6 +40,11 @@ enum SignatureEntitlements {
     static let entitlementsMagic: UInt32 = 0xfade_7171
 
     static func read(_ image: MachOFile) -> [String: Any]? {
+        readXML(image).flatMap { (try? PropertyListSerialization.propertyList(from: $0, format: nil)) as? [String: Any] }
+    }
+
+    /// The XML plist of the entitlements blob, as it lies in the signature.
+    static func readXML(_ image: MachOFile) -> Data? {
         guard let location = image.codeSignature else { return nil }
         let data = image.data
         let base = Int(location.offset), size = Int(location.size)
@@ -49,8 +58,7 @@ enum SignatureEntitlements {
             let blob = base + offset
             let length = Int(be32(data, blob + 4))
             guard be32(data, blob) == entitlementsMagic, length > 8, offset + length <= size else { continue }
-            let plist = data.subdata(in: (data.startIndex + blob + 8)..<(data.startIndex + blob + length))
-            return (try? PropertyListSerialization.propertyList(from: plist, format: nil)) as? [String: Any]
+            return data.subdata(in: (data.startIndex + blob + 8)..<(data.startIndex + blob + length))
         }
         return nil
     }
@@ -74,6 +82,12 @@ public struct SigningFacts: Equatable, Sendable {
     public var profileTeams: [String] = []
     public var profileApplicationIdentifier: String?
     public var profileKeychainGroups: [String] = []
+    /// What kind of profile the installer used (development, ad hoc, enterprise or App Store): the stores that sign
+    /// with a shared certificate differ here, and it decides what the system lets a loaded library claim.
+    public var profileKind: String?
+    /// How many entitlements the profile grants and how many the executable's own signature carries.
+    public var profileEntitlementCount: Int?
+    public var signedEntitlementCount: Int?
     /// Nil when the executable's signature carries no entitlements at all.
     public var signedApplicationIdentifier: String?
     public var signedKeychainGroups: [String]?
@@ -93,6 +107,9 @@ public struct SigningFacts: Equatable, Sendable {
         facts.profileTeams = profile?["TeamIdentifier"] as? [String] ?? []
         facts.profileApplicationIdentifier = granted?["application-identifier"] as? String
         facts.profileKeychainGroups = granted?["keychain-access-groups"] as? [String] ?? []
+        facts.profileKind = profile.map { ProvisioningProfile.kind(of: $0) }
+        facts.profileEntitlementCount = granted?.count
+        facts.signedEntitlementCount = signed?.count
         if let signed {
             facts.signedApplicationIdentifier = signed["application-identifier"] as? String
             facts.signedKeychainGroups = signed["keychain-access-groups"] as? [String] ?? []
@@ -108,6 +125,7 @@ public struct SigningFacts: Equatable, Sendable {
         if let profileName {
             let expiry = profileExpires.map { ", expires \($0.formatted(.iso8601))" } ?? ""
             lines.append("profile: \(profileName)\(expiry), team \(list(profileTeams))")
+            if let profileKind { lines.append("profile kind: \(profileKind)") }
             lines.append("profile application-identifier: \(profileApplicationIdentifier ?? "none")")
             lines.append("profile keychain-access-groups: \(list(profileKeychainGroups))")
         } else {
@@ -115,6 +133,9 @@ public struct SigningFacts: Equatable, Sendable {
         }
         if let signedKeychainGroups {
             lines.append("signed application-identifier: \(signedApplicationIdentifier ?? "none")")
+            if let signedEntitlementCount, let profileEntitlementCount {
+                lines.append("entitlements: \(signedEntitlementCount) signed in the app, \(profileEntitlementCount) granted by its profile")
+            }
             lines.append("signed keychain-access-groups: \(list(signedKeychainGroups))")
         } else {
             lines.append("signed entitlements: none")

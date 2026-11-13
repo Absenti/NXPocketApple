@@ -17,9 +17,21 @@ public struct DeviceSigner: FrameworkSigner {
         /// An explicit empty dict. This is what probe tests 5A and 5B signed with, and iOS refused both outside the
         /// bundle (`code signature invalid`). Kept for the tests and for comparison, never for a game.
         case none
-        /// The app's own entitlements, out of its provisioning profile: what LiveContainer's re-signing amounts to,
-        /// and exactly what probe test 5C signs with (an empty entitlements path, so zsign takes the profile's).
+        /// The profile's own entitlements: what LiveContainer's re-signing amounts to, and exactly what probe test 5C
+        /// signs with (an empty entitlements path, so zsign takes the profile's). The proven choice under SideStore.
         case appProfile
+        /// The entitlements the installer signed into the running app, copied byte for byte
+        /// (`AppSignature.entitlementsXML`). Where a store's profile and the app's signature disagree (a wildcard or
+        /// shared App ID, entitlements trimmed at install), this is the one that agrees with the app.
+        case appSigned
+
+        init?(tag: String?) {
+            switch tag {
+            case EntitlementsChoice.profile.tag: self = .appProfile
+            case EntitlementsChoice.app.tag: self = .appSigned
+            default: return nil
+            }
+        }
     }
 
     /// `.appProfile`: probe test 5C loaded a framework from Documents and ran its remapped code page on an iPhone
@@ -27,8 +39,9 @@ public struct DeviceSigner: FrameworkSigner {
     /// The copy grants nothing: a process's rights are the main executable's, so a game still gets exactly the app's.
     /// What makes the difference is that the loaded image agrees with the app about which app it belongs to.
     ///
-    /// Games signed under another choice are not re-signed by themselves (`needsResign` looks at the certificate
-    /// only): remove and import them again after a change.
+    /// It is the default, and `SigningPreference` moves to `.appSigned` for an installation where dyld refuses a game
+    /// signed so (`ShellHostModel.start`). A game's identity carries the choice (`SigningIdentity.entitlementsTag`)
+    /// and its signing record remembers it, so a change re-signs the games by itself (`SigningRecord.needsResign`).
     public static let defaultEntitlements: Entitlements = .appProfile
 
     public let entitlements: Entitlements
@@ -51,8 +64,8 @@ public struct DeviceSigner: FrameworkSigner {
         try credentials.p12.write(to: scratch, options: [.atomic, .completeFileProtectionUnlessOpen])
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: scratch.path)
 
-        guard let provision = Bundle.main.bundleURL.appendingPathComponent("embedded.mobileprovision").path as String?,
-              FileManager.default.fileExists(atPath: provision) else {
+        let provision = Bundle.main.bundleURL.appendingPathComponent("embedded.mobileprovision").path
+        guard FileManager.default.fileExists(atPath: provision) else {
             // zsign takes the team ID and the entitlements from the profile: without it there is nothing to sign with.
             throw NXPocketError(.noCertificate, "this app has no embedded provisioning profile to sign with")
         }
@@ -65,13 +78,19 @@ public struct DeviceSigner: FrameworkSigner {
             .appendingPathComponent("nxpocket-\(UUID().uuidString)-entitlements.plist")
         defer { try? FileManager.default.removeItem(at: entitlements) }
         let entitlementsPath: String
-        switch self.entitlements {
+        switch Entitlements(tag: identity.entitlementsTag) ?? self.entitlements {
         case .none:
             let empty = #"<?xml version="1.0" encoding="UTF-8"?>\#n<plist version="1.0"><dict/></plist>\#n"#
             try Data(empty.utf8).write(to: entitlements, options: [.atomic, .completeFileProtectionUnlessOpen])
             entitlementsPath = entitlements.path
         case .appProfile:
             entitlementsPath = ""
+        case .appSigned:
+            guard let signed = AppSignature.entitlementsXML else {
+                throw NXPocketError(.signingFailed, "this app's own signature carries no entitlements to copy")
+            }
+            try signed.write(to: entitlements, options: [.atomic, .completeFileProtectionUnlessOpen])
+            entitlementsPath = entitlements.path
         }
 
         // The framework folder and the name of the Mach-O inside it: zsign is handed the binary, not the bundle,
@@ -117,6 +136,25 @@ public struct DeviceSigner: FrameworkSigner {
             throw NXPocketError(.packageMissing, "\(framework.lastPathComponent) has no usable Info.plist")
         }
         return name
+    }
+}
+
+/// What a signature leaves in `tmp/` if the app is killed before it cleans up: the certificate (`nxpocket-<uuid>.p12`)
+/// and the entitlements file. Signing removes both on every way out, but a kill is not a way out; they are removed at
+/// the next start, when nothing is signing.
+public enum SigningLeftovers {
+    public static func isLeftover(_ name: String) -> Bool {
+        name.hasPrefix("nxpocket-") && (name.hasSuffix(".p12") || name.hasSuffix("-entitlements.plist"))
+    }
+
+    @discardableResult
+    public static func clean(in folder: URL = FileManager.default.temporaryDirectory,
+                             fileManager: FileManager = .default) -> [String] {
+        var removed: [String] = []
+        for name in (try? fileManager.contentsOfDirectory(atPath: folder.path)) ?? [] where isLeftover(name) {
+            if (try? fileManager.removeItem(at: folder.appendingPathComponent(name))) != nil { removed.append(name) }
+        }
+        return removed.sorted()
     }
 }
 

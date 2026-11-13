@@ -44,7 +44,7 @@ public final class ShellHostModel: ObservableObject {
     @Published public private(set) var certificateProblem: String?
     @Published public var importState: ImportState = .idle
     @Published public var launch: LaunchState = .idle
-    @Published public private(set) var loadTest: LoadTestState = .idle
+    @Published public internal(set) var loadTest: LoadTestState = .idle
     @Published public private(set) var failedLaunch: LaunchMarker?
     /// The names the player gave games, by title ID (`GameChoices.name`).
     @Published public internal(set) var names: [String: String] = [:]
@@ -60,7 +60,7 @@ public final class ShellHostModel: ObservableObject {
     @Published public private(set) var touch: TouchControls
 
     public let engineHost: EngineHost
-    /// Whether a newer iPorterNX exists (`UpdateChannel`, the app's only network call).
+    /// Whether a newer NXPocketApple exists (`UpdateChannel`, the app's only network call).
     public let updates: UpdateChecker
 
     let importer: ImportService
@@ -92,6 +92,7 @@ public final class ShellHostModel: ObservableObject {
         BackupExclusion.excludeImportantFolders(in: documents)
         GameLogs.fileSharedLogs(documents: documents)
         GameSaves.cleanLeftovers(in: [documents, FileManager.default.temporaryDirectory])
+        SigningLeftovers.clean()
         pendingLaunch = NextLaunch.take(documents: documents)?.description
         loadCertificate()
         refresh()
@@ -176,6 +177,7 @@ public final class ShellHostModel: ObservableObject {
             log.append(String(format: "launch: first screen %.0f ms after the process started",
                               Date().timeIntervalSince(started) * 1000))
         }
+        log.append(MemoryBudget.summaryLine)
         startPendingLaunch()
     }
 
@@ -190,6 +192,10 @@ public final class ShellHostModel: ObservableObject {
         return certificate.teamID == team
     }
 
+    /// Whether this app was installed with a distribution profile (ad hoc, enterprise, App Store): its signature has no
+    /// `get-task-allow`. Games may then be refused by iOS whatever else is right (`SigningDiagnosis.Verdict.distributionProfile`).
+    public var installIsForDistribution: Bool { SigningDiagnosis.isDistributionSigned(AppSignature.entitlements) }
+
     /// Whether the imported certificate is one the app's current profile allows (nil: no profile, or none imported).
     public var certificateInAppProfile: Bool? {
         certificate.flatMap { ProvisioningProfile.allows(certificateSHA256: $0.sha256) }
@@ -199,7 +205,7 @@ public final class ShellHostModel: ObservableObject {
         guard let certificate else { return nil }
         return SigningIdentity(identifier: appIdentifier, teamID: certificate.teamID,
                                certificateSHA256: certificate.sha256, subject: certificate.subject,
-                               expires: certificate.expires)
+                               expires: certificate.expires, entitlementsTag: SigningPreference.current.tag)
     }
 
     public func gamesNeedingSignature() -> [InstalledGame] {
@@ -243,6 +249,7 @@ public final class ShellHostModel: ObservableObject {
         }
         certificate = parsed.certificate
         certificateProblem = nil
+        SigningPreference.forget()   // a new certificate may be accepted where the old one was refused
         triedTransfers = []   // a transfer refused for the certificate may go in now
         log.append("certificate \(parsed.certificate.subject) imported, expires \(parsed.certificate.expires)")
     }
@@ -356,16 +363,16 @@ public final class ShellHostModel: ObservableObject {
         }
     }
 
-    /// Removes a game. `saves`: everything goes, its saves, its settings, its name and its logs too; otherwise they
+    /// Removes a game. `includingSaves`: everything goes, its saves, its settings, its name and its logs too; otherwise they
     /// stay for when the game is sent again.
-    public func remove(_ game: InstalledGame, saves: Bool) {
+    public func remove(_ game: InstalledGame, includingSaves: Bool) {
         do {
-            try GameRemoval.remove(game, saves: saves)
-            if saves {
+            try GameRemoval.remove(game, includingSaves: includingSaves)
+            if includingSaves {
                 GameChoices.remove(titleID: game.id, documents: documents)
                 GameLogs.removeAll(titleID: game.id, documents: documents)
             }
-            log.append("removed \(game.titleID)\(saves ? " with its saves, settings and logs" : ", its saves kept")")
+            log.append("removed \(game.titleID)\(includingSaves ? " with its saves, settings and logs" : ", its saves kept")")
         } catch {
             log.append("could not remove \(game.titleID): \(error.localizedDescription)")
         }
@@ -486,7 +493,7 @@ public final class ShellHostModel: ObservableObject {
     /// Loads the framework and hands it to its own host, on the main thread: the framework's initialisers and the
     /// game's view expect it. The host's early loading then runs in the background while the game's view comes up
     /// and starts the game (`FrameworkEngineHost`).
-    private func start(_ game: InstalledGame, plan: EngineLaunchPlan) {
+    private func start(_ game: InstalledGame, plan: EngineLaunchPlan, retrying previous: EntitlementsChoice? = nil) {
         activeTitleID = game.id
         launch = .launching(name(of: game))
         LaunchGuard.clear(in: documents)
@@ -505,10 +512,25 @@ public final class ShellHostModel: ObservableObject {
             }
         } catch {
             LaunchGuard.clear(in: documents)
-            launch = .failed(message(for: error))
-            log.append("launch of \(game.titleID) failed: \(error)")
+            if Self.isCodeRefusal(error) {
+                if previous == nil, signWithOtherEntitlements(game, after: error, then: { self.start($0, plan: plan, retrying: $1) }) {
+                    return
+                }
+                if let previous {
+                    // Both choices were refused: the first stays the default, and nothing is signed again at each tap.
+                    SigningPreference.remember(previous, exhausted: true)
+                }
+                launch = .failed(refusalMessage(for: game, plan: plan, error: error))
+            } else {
+                launch = .failed(message(for: error))
+                log.append("launch of \(game.titleID) failed: \(error)")
+            }
             refresh()
             return
+        }
+        if let previous {
+            // The second choice loaded where the first was refused: every game is signed so from now on.
+            log.append("the \(SigningPreference.current.tag) entitlements load on this installation; the \(previous.tag) ones were refused")
         }
         // The marker stays while the game is on screen, so a game that kills the app shows up as a failed launch at the
         // next start, with its log. Leaving the game for the home screen is no failure: the marker goes then.
@@ -574,34 +596,46 @@ public final class ShellHostModel: ObservableObject {
             }
             // Let the "loading" line reach the screen before the main thread is busy with dyld.
             await Task.yield()
-            self.finishLoadTest(game, self.loadFramework(game, plan: plan, signingSeconds: signingSeconds))
+            do {
+                self.finishLoadTest(game, .finished(try self.loadFramework(game, plan: plan, signingSeconds: signingSeconds)))
+            } catch where Self.isCodeRefusal(error) {
+                let first = SigningPreference.current
+                if self.signWithOtherEntitlements(game, after: error, then: { retried, _ in
+                    do {
+                        self.finishLoadTest(retried, .finished(try self.loadFramework(retried, plan: plan, signingSeconds: signingSeconds)))
+                        self.log.append("the \(SigningPreference.current.tag) entitlements load on this installation; the \(first.tag) ones were refused")
+                    } catch {
+                        SigningPreference.remember(first, exhausted: true)
+                        self.finishLoadTest(retried, .failed(self.refusalMessage(for: retried, plan: plan, error: error)))
+                    }
+                }) { return }
+                self.finishLoadTest(game, .failed(self.refusalMessage(for: game, plan: plan, error: error)))
+            } catch {
+                self.finishLoadTest(game, .failed(self.message(for: error)))
+            }
         }
     }
 
     /// The load itself, on the main thread like `start()`: a game's initialisers may expect it. The launch marker is
     /// written first, so a framework that kills the app while it loads shows up as a failed launch on the next start.
-    private func loadFramework(_ game: InstalledGame, plan: EngineLaunchPlan, signingSeconds: Double?) -> LoadTestState {
+    private func loadFramework(_ game: InstalledGame, plan: EngineLaunchPlan, signingSeconds: Double?) throws -> LoadTestReport {
         let executableBytes = (try? FileManager.default.attributesOfItem(atPath: plan.frameworkExecutable.path))?[.size]
             as? Int64 ?? 0
         let availableBefore = MemoryBudget.availableBytes
-        do {
-            try plan.checkExecutable()
-            try LaunchGuard.willLaunch(titleID: game.titleID, in: documents)
-            defer { LaunchGuard.clear(in: documents) }
-            let started = Date()
-            let framework = try FrameworkLoader.load(executable: plan.frameworkExecutable)
-            let loadSeconds = Date().timeIntervalSince(started)
-            let markerFound = (try? FrameworkLoader.verify(framework, marker: plan.imageMarker)) != nil
-            let modules = FrameworkLoader.moduleSections(of: framework, modules: game.manifest?.modules ?? [],
-                                                         nroCount: game.manifest?.nroCount ?? 0)
-            return .finished(LoadTestReport(signingSeconds: signingSeconds, executableBytes: executableBytes,
-                                            loadSeconds: loadSeconds, markerFound: markerFound,
-                                            marker: plan.imageMarker, modules: modules,
-                                            availableBefore: availableBefore,
-                                            availableAfter: MemoryBudget.availableBytes))
-        } catch {
-            return .failed(message(for: error))
-        }
+        try plan.checkExecutable()
+        try LaunchGuard.willLaunch(titleID: game.titleID, in: documents)
+        defer { LaunchGuard.clear(in: documents) }
+        let started = Date()
+        let framework = try FrameworkLoader.load(executable: plan.frameworkExecutable)
+        let loadSeconds = Date().timeIntervalSince(started)
+        let markerFound = (try? FrameworkLoader.verify(framework, marker: plan.imageMarker)) != nil
+        let modules = FrameworkLoader.moduleSections(of: framework, modules: game.manifest?.modules ?? [],
+                                                     nroCount: game.manifest?.nroCount ?? 0)
+        return LoadTestReport(signingSeconds: signingSeconds, executableBytes: executableBytes,
+                              loadSeconds: loadSeconds, markerFound: markerFound,
+                              marker: plan.imageMarker, modules: modules,
+                              availableBefore: availableBefore,
+                              availableAfter: MemoryBudget.availableBytes)
     }
 
     private func finishLoadTest(_ game: InstalledGame, _ state: LoadTestState) {

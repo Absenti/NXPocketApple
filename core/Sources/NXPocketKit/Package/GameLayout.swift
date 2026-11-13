@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where iPorterNX keeps things. Both apps read these names, so they live in one place.
+/// Where NXPocketApple keeps things. Both apps read these names, so they live in one place.
 public enum GameLayout {
     public static let gamesFolder = "games"
     public static let incomingFolder = ".incoming"
@@ -43,16 +43,23 @@ public struct SigningRecord: Codable, Equatable, Sendable {
     public var subject: String
     public var signedAt: Date
     public var expires: Date
+    /// Which entitlements the signature carries (`SigningIdentity.entitlementsTag`). Nil in a record written before
+    /// there was a choice: those games carry the provisioning profile's, as every game did.
+    public var entitlements: String?
 
     public init(certificateSHA256: String, identifier: String, teamID: String, subject: String,
-                signedAt: Date, expires: Date) {
+                signedAt: Date, expires: Date, entitlements: String? = nil) {
         self.certificateSHA256 = certificateSHA256
         self.identifier = identifier
         self.teamID = teamID
         self.subject = subject
         self.signedAt = signedAt
         self.expires = expires
+        self.entitlements = entitlements
     }
+
+    /// What a record without an `entitlements` field means.
+    public static let defaultEntitlementsTag = "profile"
 
     /// The app refreshes a game's signature before the certificate runs out, not after.
     public static let refreshWindow: TimeInterval = 24 * 3600
@@ -61,6 +68,9 @@ public struct SigningRecord: Codable, Equatable, Sendable {
         certificateSHA256 != identity.certificateSHA256
             || identifier != identity.identifier
             || expires.timeIntervalSince(now) < Self.refreshWindow
+            // A game signed with other entitlements than the ones that now load on this phone (the app switched after
+            // iOS refused the first choice) is signed again, with no click from the player.
+            || (identity.entitlementsTag.map { $0 != (entitlements ?? Self.defaultEntitlementsTag) } ?? false)
     }
 }
 
@@ -71,13 +81,18 @@ public struct SigningIdentity: Equatable, Sendable {
     public var certificateSHA256: String
     public var subject: String
     public var expires: Date
+    /// Which entitlements a game is signed with: `"profile"` (the provisioning profile's) or `"app"` (the ones in the
+    /// running app's own signature). Nil leaves the choice to the signer.
+    public var entitlementsTag: String?
 
-    public init(identifier: String, teamID: String, certificateSHA256: String, subject: String, expires: Date) {
+    public init(identifier: String, teamID: String, certificateSHA256: String, subject: String, expires: Date,
+                entitlementsTag: String? = nil) {
         self.identifier = identifier
         self.teamID = teamID
         self.certificateSHA256 = certificateSHA256
         self.subject = subject
         self.expires = expires
+        self.entitlementsTag = entitlementsTag
     }
 
     public var isExpired: Bool { expires <= Date() }

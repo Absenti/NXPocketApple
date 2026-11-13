@@ -22,69 +22,112 @@ struct RootView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .onAppear { model.startDeviceWatch() }
+        // A new release is offered once, when the launcher starts and finds one: never a button to go and look.
+        .sheet(isPresented: $model.showUpdateSheet) { UpdateSheet() }
+    }
+
+    /// The screens in three groups: the games, the iPhone, this Mac.
+    private var groups: [(title: String, screens: [AppModel.Screen])] {
+        [("Games", [.library, .build]), ("iPhone", [.devices, .phoneApp]), ("This Mac", [.setup, .settings])]
     }
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("iPorterNX").font(.system(size: 17, weight: .semibold)).foregroundStyle(Ink.primary)
-                Text("Switch games on your iPhone").font(.system(size: 11)).foregroundStyle(Ink.secondary)
+            HStack(spacing: 10) {
+                PocketMark(size: 36).shadow(color: Ink.accent.opacity(0.18), radius: 10)
+                Text("NXPocketApple").font(.system(size: 16, weight: .heavy)).tracking(-0.3).foregroundStyle(Ink.primary)
             }
             .padding(.horizontal, 16)
             .padding(.top, 18)
-            .padding(.bottom, 14)
+            .padding(.bottom, 6)
 
-            ForEach(AppModel.Screen.allCases) { screen in
-                Button {
-                    model.screen = screen
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: screen.symbol).frame(width: 18)
-                        Text(screen.title)
-                        Spacer()
-                        if screen == .library, !model.games.isEmpty { Text("\(model.games.count)").foregroundStyle(Ink.secondary) }
-                        if screen == .setup, model.setupIncomplete {
-                            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Ink.accent)
-                        }
-                    }
-                    .font(.system(size: 13))
-                    .foregroundStyle(model.screen == screen ? Ink.primary : Ink.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(model.screen == screen ? Ink.raised : .clear,
-                                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    // A plain button takes clicks only on what it draws: the icon and the word, not the empty
-                    // part of the row. The whole row is the target.
-                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            ForEach(groups, id: \.title) { group in
+                SectionHeading(text: group.title)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 18)
+                    .padding(.bottom, 6)
+                ForEach(group.screens) { screen in
+                    navRow(screen)
                 }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 6)
             }
 
             Spacer()
 
             if model.queueHasWork {
-                VStack(alignment: .leading, spacing: 6) {
-                    let finished = model.queue.filter { $0.phase.isFinished }.count
-                    Text("Queue · \(finished) of \(model.queue.count) done").font(.system(size: 11)).foregroundStyle(Ink.secondary)
-                    Bar(fraction: model.queueFraction)
-                    if let item = model.activeItem {
-                        Text("\(item.name) · \(item.status)").font(.system(size: 11)).foregroundStyle(Ink.secondary).lineLimit(1)
-                        Bar(fraction: item.fraction, tint: item.sends && item.fraction >= (item.builds ? 0.75 : 0) ? Ink.good : Ink.accent)
-                    }
-                }
-                .padding(12)
-                .onTapGesture { model.screen = .build }
+                queueCard.padding(12)
             }
 
-            Text(model.engineReport)
-                .font(.system(size: 10))
-                .foregroundStyle(Ink.secondary)
-                .lineLimit(2)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 14)
+            Color.clear.frame(height: 14)
         }
         .background(Ink.surface)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 216, max: 260)
+        .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
+    }
+
+    private func navRow(_ screen: AppModel.Screen) -> some View {
+        let selected = model.screen == screen
+        return Button {
+            model.screen = screen
+        } label: {
+            HStack(spacing: 11) {
+                Image(systemName: screen.symbol).font(.system(size: 14, weight: .medium)).foregroundStyle(Ink.accent).frame(width: 20)
+                Text(screen.title)
+                Spacer()
+                if screen == .library, !model.games.isEmpty {
+                    Text("\(model.games.count)").font(.system(size: 12)).foregroundStyle(Ink.secondary)
+                }
+                if screen == .setup, model.setupIncomplete {
+                    Circle().fill(Ink.deep).frame(width: 9, height: 9)
+                }
+                if screen == .devices, model.selectedDevice != nil {
+                    Circle().fill(Ink.good).frame(width: 8, height: 8)
+                }
+            }
+            .font(.system(size: 14, weight: selected ? .bold : .semibold))
+            .foregroundStyle(Ink.primary)
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .background(selected ? Ink.tint : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(selected ? Ink.accent.opacity(0.28) : .clear))
+            // A plain button takes clicks only on what it draws: the whole row is the target.
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 10)
+    }
+
+    /// The running queue: a stitched card that opens the Build screen, where the queue lives.
+    private var queueCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            let finished = model.queue.filter { $0.phase.isFinished }.count
+            HStack {
+                Text("Queue").font(.system(size: 12, weight: .bold))
+                Spacer()
+                Text("\(finished) of \(model.queue.count) done").font(.system(size: 11)).foregroundStyle(Ink.secondary)
+                if let item = model.activeItem, item.canPause {
+                    Button { model.togglePause(item.id) } label: {
+                        Image(systemName: item.isPaused ? "play.circle.fill" : "pause.circle.fill")
+                            .font(.system(size: 14)).foregroundStyle(item.isPaused ? Ink.accent : Ink.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(item.isPaused ? "Resume the build" : "Pause the build: nothing is lost")
+                    .accessibilityLabel(item.isPaused ? "Resume the build" : "Pause the build")
+                }
+                Button { model.cancelQueue() } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 14)).foregroundStyle(Ink.secondary)
+                }
+                .buttonStyle(.plain).help("Cancel the queue: the send under way is stopped")
+                .accessibilityLabel("Cancel the queue")
+            }
+            Bar(fraction: model.queueFraction)
+            if let item = model.activeItem {
+                Text("\(item.name) · \(item.status)").font(.system(size: 11)).foregroundStyle(Ink.secondary).lineLimit(1)
+                Bar(fraction: item.fraction, tint: item.sends && item.fraction >= (item.builds ? 0.75 : 0) ? Ink.good : Ink.deep)
+            }
+        }
+        .padding(12)
+        .background(Ink.raised, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .stitched(radius: 14)
+        .onTapGesture { model.screen = .build }
     }
 }

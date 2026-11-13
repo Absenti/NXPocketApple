@@ -154,6 +154,7 @@ public final class GameImporter {
         }
         if let signer, let identity {
             progress(ImportProgress(stage: .signing, fraction: 0.75, detail: "signing \(verified.package.framework)"))
+            try confirmExecutable(of: verified)
             let signature = try signer.sign(framework: verified.frameworkURL, identity: identity)
             guard signature.hasCertificate else {
                 throw NXPocketError(.noCertificate, "the framework came back ad hoc signed: no certificate was used")
@@ -167,9 +168,13 @@ public final class GameImporter {
             }
             record = SigningRecord(certificateSHA256: identity.certificateSHA256, identifier: identity.identifier,
                                    teamID: identity.teamID, subject: identity.subject,
-                                   signedAt: Date(), expires: identity.expires)
+                                   signedAt: Date(), expires: identity.expires, entitlements: identity.entitlementsTag)
         } else if identity == nil, signer != nil {
             throw NXPocketError(.noCertificate, "no certificate is installed")
+        } else if signer == nil, identity != nil {
+            // A certificate and nothing to sign with: the framework would be moved into the library unsigned, listed as
+            // a game, and refused by dyld at its first launch.
+            throw NXPocketError(.signingFailed, "a certificate is installed but nothing can sign with it: the framework would be installed unsigned")
         }
 
         progress(ImportProgress(stage: .installing, fraction: 0.85, detail: "installing"))
@@ -178,6 +183,21 @@ public final class GameImporter {
         let game = GameLibrary.entry(at: destination, fileManager: fileManager)
         progress(ImportProgress(stage: .done, fraction: 1, detail: game.title))
         return game
+    }
+
+    /// The executable is hashed once more right before it is signed and compared with the listing. The folder lives in
+    /// `Documents`, which Files, share extensions and a paired Mac can write to, and the check of the whole package
+    /// came some time ago: without this, whatever the executable is by the time zsign opens it gets signed and run
+    /// with the app's privileges, with a valid signature that was never compared with the manifest. What remains is
+    /// the time zsign itself takes; the signature it writes cannot be compared afterwards, since it changes the hash.
+    func confirmExecutable(of verified: VerifiedPackage) throws {
+        let relative = verified.manifest.frameworkExecutable
+        guard let listed = verified.package.files.first(where: { $0.path == relative }) else {
+            throw NXPocketError(.packageInconsistent, "the executable \"\(relative)\" is not listed in the package", path: relative)
+        }
+        guard try FileDigest.sha256(ofFileAt: verified.executableURL) == listed.sha256 else {
+            throw NXPocketError(.hashMismatch, "\"\(relative)\" changed after it was checked and before it was signed", path: relative)
+        }
     }
 
     /// What an import writes beyond the package, which is already on this volume: the move into the library and the

@@ -1,7 +1,7 @@
 /* The one function the iPhone app needs from the signing engine.
  *
  * The engine is zsign (https://github.com/zhlynn/zsign, MIT). tools/zsign_shim.cpp is the only adapter; nothing else
- * in iPorterNX touches zsign.
+ * in NXPocketApple touches zsign.
  *
  * Three details worth recording, all learned from zsign's source rather than from its README:
  *

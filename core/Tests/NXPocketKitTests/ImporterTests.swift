@@ -14,7 +14,7 @@ final class GameImporterTests: XCTestCase {
         let importer = try makeImporter(workspace)
         let source = try PackageFixture().write(into: workspace, at: ".incoming/transfer")
 
-        let game = try importer.install(source, identity: identity(), signer: RecordingSigner(identifier: "dev.nxpocket.app"))
+        let game = try importer.install(source, identity: identity(), signer: RecordingSigner(identifier: "dev.nxpocketapple.app"))
 
         XCTAssertEqual(game.titleID.description, "0100111000200000")
         XCTAssertEqual(game.title, "Fixture Game")
@@ -32,7 +32,7 @@ final class GameImporterTests: XCTestCase {
         try workspace.write(".incoming/transfer/\(framework)/.DS_Store", bytes: 6148)
         try workspace.write(".incoming/transfer/.DS_Store", bytes: 6148)
 
-        _ = try importer.install(source, identity: identity(), signer: RecordingSigner(identifier: "dev.nxpocket.app"))
+        _ = try importer.install(source, identity: identity(), signer: RecordingSigner(identifier: "dev.nxpocketapple.app"))
 
         let installed = workspace.url("Documents/games/0100111000200000")
         XCTAssertFalse(FileManager.default.fileExists(atPath: installed.appendingPathComponent("\(framework)/.DS_Store").path),
@@ -49,7 +49,7 @@ final class GameImporterTests: XCTestCase {
         _ = try importer.install(source, identity: identity, signer: RecordingSigner(identifier: identity.identifier, teamID: identity.teamID))
 
         let record = try XCTUnwrap(GameLibrary.readSigning(workspace.url("Documents/games/0100111000200000")))
-        XCTAssertEqual(record.identifier, "dev.nxpocket.app")
+        XCTAssertEqual(record.identifier, "dev.nxpocketapple.app")
         XCTAssertEqual(record.certificateSHA256, identity.certificateSHA256)
         XCTAssertEqual(record.teamID, "ABCDE12345")
     }
@@ -71,7 +71,7 @@ final class GameImporterTests: XCTestCase {
         let importer = try makeImporter(workspace)
         let source = try PackageFixture().write(into: workspace, at: ".incoming/transfer")
         XCTAssertThrowsError(try importer.install(source, identity: identity(),
-                                                 signer: RecordingSigner(identifier: "dev.nxpocket.app", teamID: "ZZZZZ99999"))) { error in
+                                                 signer: RecordingSigner(identifier: "dev.nxpocketapple.app", teamID: "ZZZZZ99999"))) { error in
             XCTAssertEqual((error as? NXPocketError)?.code, .teamMismatch)
         }
     }
@@ -81,7 +81,7 @@ final class GameImporterTests: XCTestCase {
         let importer = try makeImporter(workspace)
         let source = try PackageFixture().write(into: workspace, at: ".incoming/transfer")
         XCTAssertThrowsError(try importer.install(source, identity: identity(),
-                                                 signer: RecordingSigner(identifier: "dev.nxpocket.app", hasCertificate: false))) { error in
+                                                 signer: RecordingSigner(identifier: "dev.nxpocketapple.app", hasCertificate: false))) { error in
             XCTAssertEqual((error as? NXPocketError)?.code, .noCertificate)
         }
     }
@@ -91,7 +91,7 @@ final class GameImporterTests: XCTestCase {
         let importer = try makeImporter(workspace)
         let source = try PackageFixture().write(into: workspace, at: ".incoming/transfer")
         XCTAssertThrowsError(try importer.install(source, identity: identity(),
-                                                 signer: RecordingSigner(identifier: "dev.nxpocket.app"),
+                                                 signer: RecordingSigner(identifier: "dev.nxpocketapple.app"),
                                                  availableCapacity: 1024)) { error in
             XCTAssertEqual((error as? NXPocketError)?.code, .notEnoughSpace)
         }
@@ -106,7 +106,7 @@ final class GameImporterTests: XCTestCase {
         let executable = try XCTUnwrap(try FileManager.default.attributesOfItem(atPath: verified.executableURL.path)[.size] as? Int64)
         XCTAssertLessThan(executable, verified.package.totalSize, "the old rule would have asked for the whole package")
         let options = ImportOptions(headroom: 0)
-        let signer = RecordingSigner(identifier: "dev.nxpocket.app")
+        let signer = RecordingSigner(identifier: "dev.nxpocketapple.app")
 
         XCTAssertThrowsError(try importer.install(source, identity: identity(), signer: signer, options: options,
                                                  availableCapacity: executable - 1)) { error in
@@ -133,7 +133,7 @@ final class GameImporterTests: XCTestCase {
     func testAnUpdateKeepsTheSaves() throws {
         let workspace = try TestWorkspace()
         let importer = try makeImporter(workspace)
-        let signer = RecordingSigner(identifier: "dev.nxpocket.app")
+        let signer = RecordingSigner(identifier: "dev.nxpocketapple.app")
         let first = try PackageFixture(version: "1.0.0").write(into: workspace, at: ".incoming/one")
         _ = try importer.install(first, identity: identity(), signer: signer)
         let save = workspace.url("Documents/games/0100111000200000/save/progress.dat")
@@ -167,7 +167,7 @@ final class GameImporterTests: XCTestCase {
     func testAKeptReplacedFolderGivesItsSavesBackLater() throws {
         let workspace = try TestWorkspace()
         let importer = try makeImporter(workspace)
-        let signer = RecordingSigner(identifier: "dev.nxpocket.app")
+        let signer = RecordingSigner(identifier: "dev.nxpocketapple.app")
         _ = try importer.install(try PackageFixture().write(into: workspace, at: ".incoming/one"), identity: identity(), signer: signer)
         _ = try PackageFixture().write(into: workspace, at: "Documents/games/.replaced-kept")
         try workspace.write("Documents/games/.replaced-kept/save/progress.dat", "chapter 4")
@@ -182,7 +182,7 @@ final class GameImporterTests: XCTestCase {
     func testAnExpiredCertificateIsRefusedBeforeSigning() throws {
         let workspace = try TestWorkspace()
         let importer = try makeImporter(workspace)
-        let signer = RecordingSigner(identifier: "dev.nxpocket.app")
+        let signer = RecordingSigner(identifier: "dev.nxpocketapple.app")
         let source = try PackageFixture().write(into: workspace, at: ".incoming/transfer")
 
         XCTAssertThrowsError(try importer.install(source, identity: identity(expiresIn: -1), signer: signer)) { error in
@@ -194,7 +194,7 @@ final class GameImporterTests: XCTestCase {
     func testAGameThatLostItsCodeOrItsRomFSIsListedAsDamaged() throws {
         let workspace = try TestWorkspace()
         let importer = try makeImporter(workspace)
-        let signer = RecordingSigner(identifier: "dev.nxpocket.app")
+        let signer = RecordingSigner(identifier: "dev.nxpocketapple.app")
         _ = try importer.install(try PackageFixture().write(into: workspace, at: ".incoming/one"), identity: identity(), signer: signer)
         let folder = workspace.url("Documents/games/0100111000200000")
         XCTAssertNil(GameLibrary.entry(at: folder).problem)
@@ -268,7 +268,7 @@ final class GameLibraryTests: XCTestCase {
         let workspace = try TestWorkspace()
         let importer = GameImporter(documents: workspace.url("Documents"), log: nil)
         let source = try PackageFixture().write(into: workspace, at: ".incoming/transfer")
-        _ = try importer.install(source, identity: identity(), signer: RecordingSigner(identifier: "dev.nxpocket.app"))
+        _ = try importer.install(source, identity: identity(), signer: RecordingSigner(identifier: "dev.nxpocketapple.app"))
 
         let games = GameLibrary.scan(documents: workspace.url("Documents"))
         XCTAssertEqual(games.count, 1)

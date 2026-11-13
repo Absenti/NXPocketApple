@@ -2,312 +2,184 @@ import SwiftUI
 import NXPMacKit
 import NXPMacModel
 
+/// The iPhone: whether it is connected, what is on it, and the built games ready to send. Built from rows, like Settings.
 struct DevicesView: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                deviceList
-                phoneSection
-                SavesCard()
-                sendSection
-                if model.queue.contains(where: \.sends) { QueueView() }
-                explanation
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+        RowsPage {
+            header
+            linkHero
+        } content: {
+            if model.devices.count != 1 { devicesGroup }
+            if let device = model.selectedDevice { phoneGroup(device) }
+            builtGroup
+            SavesCard()
+            if model.queue.contains(where: \.sends) { QueueView() }
+            HelpText(title: "How a game reaches the phone", text: """
+                NXPocketApple copies the package into the app's Documents/.incoming folder, over the cable or Wi-Fi, and \
+                writes a .complete marker last. The app on the iPhone imports only a transfer that carries that marker, \
+                verifies every file, signs the framework with your certificate, and moves it into the library. No reinstall \
+                is needed for a new game. A copy that fails or is cancelled is marked, and the iPhone deletes it when the \
+                app next opens; one cut off (cable pulled, this app quit) after ten minutes without activity.
+                """)
         }
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            Text("Devices").font(.system(size: 22, weight: .semibold)).foregroundStyle(Ink.primary)
-            if model.searchingDevices {
-                ProgressView().controlSize(.small)
-                Text("Searching…").font(.system(size: 12)).foregroundStyle(Ink.secondary)
-            } else if let last = model.lastDeviceSearch {
-                // The app looks by itself every AppModel.devicePollInterval seconds while it is in front, when it
-                // comes to the front, and before every send.
-                Text("checked \(last.formatted(date: .omitted, time: .standard)) · again every \(Int(AppModel.devicePollInterval)) s")
-                    .font(.system(size: 11)).foregroundStyle(Ink.secondary)
-            }
+        HStack(alignment: .bottom, spacing: 10) {
+            PageTitle(title: model.selectedDevice?.name ?? "iPhone", subtitle: checkedLine)
             Spacer()
+            if model.searchingDevices { ProgressView().controlSize(.small) }
             Button {
                 model.refreshDevices()
             } label: {
                 Label("Find devices", systemImage: "arrow.clockwise")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(QuietButtonStyle(large: true))
             .disabled(model.searchingDevices)
         }
     }
 
-    @ViewBuilder
-    private var deviceList: some View {
-        if model.devices.isEmpty {
-            Card {
-                HStack(spacing: 12) {
-                    Image(systemName: "cable.connector").font(.system(size: 22)).foregroundStyle(Ink.secondary)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(model.searchingDevices && model.lastDeviceSearch == nil ? "Looking for your iPhone…"
-                             : (model.deviceProblem ?? "No iPhone found."))
-                            .font(.system(size: 13)).foregroundStyle(Ink.primary)
-                        Text("Connect it by cable, unlock it and trust this Mac. It appears here by itself, and later over Wi-Fi too.")
-                            .font(.system(size: 11)).foregroundStyle(Ink.secondary)
-                    }
-                }
+    /// The app looks by itself every AppModel.devicePollInterval seconds while it is in front, when it comes to the
+    /// front, and before every send.
+    private var checkedLine: String {
+        if model.searchingDevices { return "Searching…" }
+        guard let last = model.lastDeviceSearch else { return "No search yet" }
+        return "checked \(last.formatted(date: .omitted, time: .standard)) · again every \(Int(AppModel.devicePollInterval)) s"
+    }
+
+    /// The Mac, the cable, the iPhone: what is connected, at a glance.
+    private var linkHero: some View {
+        let device = model.selectedDevice
+        return HStack(spacing: 22) {
+            endpoint(title: "This Mac") {
+                Image(systemName: "laptopcomputer").font(.system(size: 36, weight: .light)).foregroundStyle(Ink.primary)
             }
-        } else {
-            ForEach(model.devices) { device in
-                deviceCard(device)
+            ZStack {
+                DashedLine()
+                    .stroke(Ink.accent.opacity(device == nil ? 0.2 : 0.5), style: StrokeStyle(lineWidth: 3, dash: [9, 7]))
+                    .frame(height: 3)
+                Text(device.map { "Connected · \($0.transport ?? "usb")" } ?? "No iPhone")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(device == nil ? Ink.secondary : Ink.accent)
+                    .padding(.horizontal, 14).frame(height: 28)
+                    .background(Ink.background, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Ink.accent.opacity(device == nil ? 0.2 : 0.5)))
             }
+            .frame(maxWidth: .infinity)
+            endpoint(title: device?.name ?? "iPhone", glow: device != nil) {
+                PocketMark(size: 56).opacity(device == nil ? 0.35 : 1)
+            }
+        }
+        .padding(.vertical, 20).padding(.horizontal, 30)
+        .background(Ink.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .stitched(radius: 20, color: Ink.accent.opacity(device == nil ? 0.2 : 0.45))
+    }
+
+    private func endpoint<Content: View>(title: String, glow: Bool = false, @ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 8) {
+            content()
+                .frame(width: 96, height: 96)
+                .background(Ink.raised, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .strokeBorder(glow ? Ink.accent.opacity(0.5) : Ink.line))
+                .shadow(color: glow ? Ink.accent.opacity(0.14) : .clear, radius: 24)
+            Text(title).font(.system(size: 13, weight: .bold)).foregroundStyle(Ink.primary).lineLimit(1)
         }
     }
 
-    private func deviceCard(_ device: Device) -> some View {
-        let selected = model.selectedDevice?.udid == device.udid
-        return Card {
-            HStack(spacing: 14) {
-                Image(systemName: "iphone").font(.system(size: 26))
-                    .foregroundStyle(selected ? Ink.accent : Ink.secondary).frame(width: 34)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(device.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Ink.primary)
-                    Text(device.summary).font(.system(size: 12)).foregroundStyle(Ink.secondary)
-                    Text(device.udid).font(.system(size: 10, design: .monospaced)).foregroundStyle(Ink.secondary)
-                        .textSelection(.enabled)
-                }
-                Spacer()
-                Pill(text: device.canReceive ? "paired" : "not paired", color: device.canReceive ? Ink.good : Ink.bad)
-                if let transport = device.transport { Pill(text: transport) }
-                if selected {
-                    Pill(text: "selected", color: Ink.accent)
-                } else {
-                    Button("Use this one") { model.useDevice(device) }
-                        .buttonStyle(.bordered)
-                        .disabled(!device.canReceive)
+    // MARK: Groups
+
+    /// Which iPhone to use: one line each, or one line saying none was found.
+    private var devicesGroup: some View {
+        SettingsGroup(title: "Devices") {
+            if model.devices.isEmpty {
+                SettingRow(symbol: "cable.connector", title: model.searchingDevices && model.lastDeviceSearch == nil ? "Looking for your iPhone…" : "No iPhone found",
+                           detail: model.deviceProblem ?? "Connect it by cable, unlock it and trust this Mac.", detailLines: 2) { EmptyView() }
+            }
+            ForEach(model.devices) { device in
+                let selected = model.selectedDevice?.udid == device.udid
+                SettingRow(symbol: "iphone", tint: selected ? Ink.accent : Ink.secondary, title: device.name, detail: device.summary) {
+                    Pill(text: device.canReceive ? "paired" : "not paired", color: device.canReceive ? Ink.good : Ink.bad)
+                    if selected {
+                        Pill(text: "selected", color: Ink.accent)
+                    } else {
+                        Button("Use this one") { model.useDevice(device) }
+                            .buttonStyle(QuietButtonStyle(large: true)).disabled(!device.canReceive)
+                    }
                 }
             }
         }
     }
 
     /// What the selected iPhone has installed, read from its `Documents/games` (`DeviceLibrary`).
-    @ViewBuilder
-    private var phoneSection: some View {
-        if let device = model.selectedDevice {
-            Card {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        SectionHeading(text: "On \(device.name)")
-                        if model.checkingPhone {
-                            ProgressView().controlSize(.small)
-                        } else if let checked = model.phoneCheckedAt {
-                            Text("read \(checked.formatted(date: .omitted, time: .standard))")
-                                .font(.system(size: 11)).foregroundStyle(Ink.secondary)
-                        }
-                        Spacer()
-                        Button("Refresh") { model.refreshPhoneGames() }
-                            .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Ink.accent)
-                            .disabled(model.checkingPhone)
-                        if !model.phoneGames.isEmpty {
-                            Button("Back up all saves") { model.backUpAllSaves() }
-                                .buttonStyle(.bordered)
-                                .disabled(!model.backingUp.isEmpty || model.checkingPhone)
-                        }
-                    }
-                    if let problem = model.phoneProblem {
-                        Text(problem).font(.system(size: 11)).foregroundStyle(Ink.bad).textSelection(.enabled)
-                    } else if model.phoneGames.isEmpty && model.phoneCheckedAt != nil {
-                        Text("No game installed yet. A game sent shows here once iPorterNX on the iPhone has imported it.")
-                            .font(.system(size: 11)).foregroundStyle(Ink.secondary)
-                    }
-                    ForEach(model.phoneGames, id: \.titleID) { game in
-                        HStack(spacing: 8) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 8) {
-                                    Text(game.name).font(.system(size: 12, weight: .medium)).foregroundStyle(Ink.primary)
-                                    Text("\(game.titleID) · \(game.version) · \(game.packageVersion)")
-                                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(Ink.secondary)
-                                }
-                                BackupLine(titleID: game.titleID)
-                            }
-                            Spacer()
-                            if model.backingUp.contains(game.titleID) {
-                                ProgressView().controlSize(.small)
-                            } else {
-                                Button("Back up saves") { model.backUpSaves(of: [game.titleID]) }
-                                    .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Ink.accent)
-                                    .disabled(model.checkingPhone)
-                            }
-                        }
-                    }
-                    if !model.phoneGames.isEmpty {
-                        Text("Saves are copied to the Mac, never written on the iPhone: once they change (see Saves on this Mac), before a send replaces a game, and with these buttons.")
-                            .font(.system(size: 11)).foregroundStyle(Ink.secondary).fixedSize(horizontal: false, vertical: true)
+    private func phoneGroup(_ device: Device) -> some View {
+        SettingsGroup(title: "On \(device.name)") {
+            if model.checkingPhone {
+                ProgressView().controlSize(.small)
+            }
+            if !model.phoneGames.isEmpty {
+                Button("Back up all saves") { model.backUpAllSaves() }
+                    .buttonStyle(QuietButtonStyle())
+                    .disabled(!model.backingUp.isEmpty || model.checkingPhone)
+            }
+            Button("Refresh") { model.refreshPhoneGames() }.buttonStyle(QuietButtonStyle()).disabled(model.checkingPhone)
+        } content: {
+            if let problem = model.phoneProblem {
+                SettingRow(symbol: "exclamationmark.triangle", tint: Ink.bad, title: "Could not read the iPhone", detail: problem,
+                           detailColor: Ink.bad, detailLines: 3) { EmptyView() }
+            } else if model.phoneGames.isEmpty && model.phoneCheckedAt != nil {
+                SettingRow(symbol: "tray", title: "No game installed yet",
+                           detail: "A game sent shows here once the app on the iPhone has imported it.", detailLines: 2) { EmptyView() }
+            }
+            ForEach(model.phoneGames, id: \.titleID) { game in
+                SettingRow(symbol: "gamecontroller", title: game.name,
+                           detail: "\(game.version.isEmpty ? "version unknown" : "v\(game.version)") · \(backupText(game.titleID))") {
+                    if model.backingUp.contains(game.titleID) {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Button("Back up saves") { model.backUpSaves(of: [game.titleID]) }
+                            .buttonStyle(QuietButtonStyle(large: true)).disabled(model.checkingPhone)
                     }
                 }
             }
         }
     }
 
-    /// The built games, each with its own Send button: the tab is where a game goes to the phone, so it says what
+    private func backupText(_ titleID: String) -> String {
+        if let note = model.backupNotes[titleID.uppercased()] { return Friendly.text(note) }
+        guard let date = model.lastBackup(titleID) else { return "saves not backed up yet" }
+        return "saves backed up \(date.formatted(date: .abbreviated, time: .shortened))"
+    }
+
+    /// The built games, each with its own Send button: this screen is where a game goes to the phone, so it says what
     /// can be sent rather than sending people back to the library.
-    @ViewBuilder
-    private var sendSection: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading(text: "Built games")
-                if model.games.isEmpty {
-                    HStack {
-                        Text("No game built yet.").font(.system(size: 12)).foregroundStyle(Ink.secondary)
-                        Spacer()
-                        Button("Build a game") { model.screen = .build }.buttonStyle(.bordered)
-                    }
+    private var builtGroup: some View {
+        SettingsGroup(title: "Built games") {
+            if model.games.isEmpty {
+                SettingRow(symbol: "hammer", title: "No game built yet", detail: "Add a game to build it, then send it here.") {
+                    Button("Add a game") { model.screen = .build }.buttonStyle(PrimaryButtonStyle(large: true))
                 }
-                ForEach(model.games) { game in
-                    HStack(spacing: 10) {
-                        Thumbnail(image: game.iconURL.flatMap(IconCache.image(contentsOf:)), size: 32)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(game.title).font(.system(size: 13, weight: .medium)).foregroundStyle(Ink.primary)
-                            Text("\(game.titleID) · \(game.packageVersion) · \(game.byteCountText)")
-                                .font(.system(size: 10, design: .monospaced)).foregroundStyle(Ink.secondary)
-                        }
-                        if let phone = model.phoneGame(game.titleID) {
-                            Pill(text: phone.packageVersion == game.packageVersion ? "on the iPhone" : "iPhone has \(phone.packageVersion)",
-                                 color: phone.packageVersion == game.packageVersion ? Ink.good : Ink.secondary)
-                        }
-                        Spacer()
-                        if let problem = game.problem {
-                            Text(problem.detail).font(.system(size: 11)).foregroundStyle(Ink.bad).lineLimit(1)
-                        } else if let device = model.selectedDevice {
-                            Button {
-                                model.queueSend(game, to: device)
-                            } label: {
-                                Label("Send to \(device.name)", systemImage: "arrow.up.circle")
-                            }
-                            .buttonStyle(.borderedProminent).tint(Ink.accent).foregroundStyle(.black)
-                            .disabled(!game.isReady || model.queue.contains { !$0.phase.isFinished && $0.titleID == game.titleID && $0.sends })
+            }
+            ForEach(model.games) { game in
+                SettingRow(image: game.iconURL.flatMap(IconCache.image(contentsOf:)), title: game.title,
+                           detail: game.problem?.detail ?? "\(game.version.isEmpty ? "" : "v\(game.version) · ")\(game.byteCountText)",
+                           detailColor: game.problem == nil ? Ink.secondary : Ink.bad) {
+                    if let phone = model.phoneGame(game.titleID) {
+                        let same = phone.packageVersion == game.packageVersion
+                        Pill(text: same ? "on the iPhone" : "other version on the iPhone", color: same ? Ink.good : Ink.secondary)
+                    }
+                    if game.problem == nil {
+                        if let device = model.selectedDevice {
+                            Button { model.queueSend(game, to: device) } label: { Label("Send", systemImage: "arrow.up") }
+                                .buttonStyle(PrimaryButtonStyle())
+                                .disabled(!game.isReady || model.queue.contains { !$0.phase.isFinished && $0.titleID == game.titleID && $0.sends })
                         } else {
-                            Text("connect an iPhone to send").font(.system(size: 11)).foregroundStyle(Ink.secondary)
+                            Text("connect an iPhone").font(.system(size: 12)).foregroundStyle(Ink.secondary)
                         }
                     }
                 }
-            }
-        }
-    }
-
-    private var explanation: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading(text: "How a game reaches the phone")
-                Text("""
-                iPorterNX copies the package into the app's Documents/.incoming folder, over the cable or Wi-Fi, and writes a \
-                .complete marker last. iPorterNX on the iPhone imports only a transfer that carries that marker, \
-                verifies every file, signs the framework with your certificate, and moves it into the library. \
-                No reinstall is needed for a new game. A copy that fails or is cancelled is marked, and iPorterNX on \
-                the iPhone deletes it when it next opens; one cut off (cable pulled, this app quit) after ten minutes \
-                without activity.
-                """)
-                .font(.system(size: 12)).foregroundStyle(Ink.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
-struct SettingsView: View {
-    @EnvironmentObject private var model: AppModel
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Settings").font(.system(size: 22, weight: .semibold)).foregroundStyle(Ink.primary)
-
-                UpdateCard()
-
-                Card {
-                    VStack(alignment: .leading, spacing: 14) {
-                        SectionHeading(text: "Engine")
-                        row("NX2Apple engine", model.settings.value.engineRoot.isEmpty ? model.toolchain.engine.root.path : model.settings.value.engineRoot,
-                            "The folder that holds scripts/ and dm/. tools/bootstrap.sh syncs it.") { model.chooseEngineFolder() }
-                        row("Xcode", model.toolchain.xcode?.path ?? "not found",
-                            "The engine needs the iOS SDK. Pick 27.2 when the App Store build is newer.") { model.chooseXcode() }
-                        row("Python", model.toolchain.python.path,
-                            "Python 3.12+ with lz4, capstone, fonttools, zbic and nsz. Chosen by itself; tools/setup_python.sh makes one.") {
-                            model.choosePython()
-                        }
-                        if let problem = model.pythonProblem {
-                            Text(problem).font(.system(size: 11)).foregroundStyle(Ink.bad).textSelection(.enabled)
-                        }
-                        FieldRow(label: "Status", hint: "Re-checked when a path changes.") {
-                            Text(model.engineReport).font(.system(size: 11, design: .monospaced)).foregroundStyle(Ink.secondary)
-                                .textSelection(.enabled)
-                        }
-                    }
-                }
-
-                Card {
-                    VStack(alignment: .leading, spacing: 14) {
-                        SectionHeading(text: "Keys")
-                        row("prod.keys", model.settings.value.keysFile.isEmpty ? "not set" : model.settings.value.keysFile,
-                            "Your console's keys. They identify each package in the games folder (base game, update, DLC, version, icon) and the engine needs them to build. They stay on this Mac: never copied into a package or written to a log.") {
-                            model.chooseKeysFile()
-                        }
-                        if let problem = model.keysProblem, !model.settings.value.keysFile.isEmpty {
-                            Text(problem).font(.system(size: 11)).foregroundStyle(Ink.bad)
-                        }
-                    }
-                }
-
-                Card {
-                    VStack(alignment: .leading, spacing: 14) {
-                        SectionHeading(text: "Packages")
-                        row("Output folder", model.settings.value.outputURL.path,
-                            "Each build writes one <title ID>.nxgame folder here.") { model.chooseOutputFolder() }
-                        row("Engine work folder", model.settings.value.workFolder.isEmpty ? "beside each base game, in the games folder" : model.settings.value.workFolder,
-                            "The engine's <title ID>_build folders: extracted game files and shader cache, gigabytes per game. Beside the games, a build reuses what the engine extracted before. Elsewhere, the games folder is only read (a read-only volume, an iCloud folder), and each game is extracted once more there.") {
-                            model.chooseWorkFolder()
-                        }
-                        if !model.settings.value.workFolder.isEmpty {
-                            Button("Put them beside the games again") { model.settings.value.workFolder = "" }
-                                .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Ink.accent)
-                        }
-                        FieldRow(label: "iPhone app bundle ID", hint: "Must match the app installed on the phone, or Documents is lost.") {
-                            TextField("dev.nxpocket.app", text: Binding(get: { model.settings.value.bundleID },
-                                                                        set: { model.settings.value.bundleID = $0 }))
-                                .textFieldStyle(.roundedBorder)
-                                .font(.system(size: 12, design: .monospaced))
-                        }
-                    }
-                }
-
-                Card {
-                    VStack(alignment: .leading, spacing: 10) {
-                        SectionHeading(text: "What iPorterNX never does")
-                        ForEach(["Ask for your Apple ID password.",
-                                 "Copy prod.keys into a package, a log or a repository.",
-                                 "Send anything to a server: the engine runs on this Mac."], id: \.self) { line in
-                            HStack(alignment: .top, spacing: 8) {
-                                Image(systemName: "checkmark.seal").foregroundStyle(Ink.good).font(.system(size: 12))
-                                Text(line).font(.system(size: 12)).foregroundStyle(Ink.secondary)
-                            }
-                        }
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(20)
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-
-    private func row(_ label: String, _ value: String, _ hint: String, action: @escaping () -> Void) -> some View {
-        FieldRow(label: label, hint: hint) {
-            HStack(spacing: 8) {
-                Text(value).font(.system(size: 12)).foregroundStyle(Ink.primary)
-                    .lineLimit(1).truncationMode(.middle).frame(maxWidth: .infinity, alignment: .leading)
-                Button("Choose…", action: action).buttonStyle(.bordered).font(.system(size: 12))
             }
         }
     }
@@ -322,12 +194,12 @@ struct BackupLine: View {
         HStack(spacing: 6) {
             if let date = model.lastBackup(titleID) {
                 Text("saves backed up \(date.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.system(size: 10)).foregroundStyle(Ink.good)
+                    .font(.system(size: 11)).foregroundStyle(Ink.good)
             } else {
-                Text("saves not backed up yet").font(.system(size: 10)).foregroundStyle(Ink.secondary)
+                Text("saves not backed up yet").font(.system(size: 11)).foregroundStyle(Ink.secondary)
             }
             if let note = model.backupNotes[titleID.uppercased()] {
-                Text("· \(note)").font(.system(size: 10))
+                Text("· \(Friendly.text(note))").font(.system(size: 11))
                     .foregroundStyle(note.hasPrefix("backup failed") ? Ink.bad : Ink.secondary).lineLimit(2)
             }
         }
