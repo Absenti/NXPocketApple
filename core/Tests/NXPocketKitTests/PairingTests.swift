@@ -80,7 +80,7 @@ final class PairingAndAddressTests: XCTestCase {
     func testALinkSaysWhatTheQRCodeSaysAndNothingElseIsBelieved() throws {
         let pin = String(repeating: "ab", count: 32)
         let secret = PairingProof.makeSecret()
-        let link = PairLink(address: "Momos-Mac.local", port: 49217, pin: pin, secret: secret, name: "Momo's Mac")
+        let link = PairLink(address: "test-mac.local", port: 49217, pin: pin, secret: secret, name: "Test Mac")
         let url = try XCTUnwrap(link.url)
         XCTAssertEqual(PairLink(url: url), link, "what is shown is what is read")
 
