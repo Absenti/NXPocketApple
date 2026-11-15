@@ -16,6 +16,36 @@ them, without reinstalling the app for each game.
   <img src="docs/images/iphone-controls.png" width="620" alt="Touch controls editor">
 </p>
 
+## Features
+
+**Play**
+- Native speed: the game's own code runs on the iPhone, Metal draws it. Touch controls with an editor.
+- TV out, with the phone as the pad.
+- *Cheats*: import an Atmosphère cheat file, switch each cheat on or off.
+- Per-game detail: sessions, average frame rate, last-session chart (frame rate, heat, battery).
+
+**Library**
+- One app for every game: no reinstall per game; certificate-expiry notification.
+- *Offload* a game to free space; its saves and settings stay. *Check and repair* fixes damaged files.
+- Cloud tiles: **build a game on the Mac from the iPhone** and follow it in *Activity*.
+- Quick actions for recent games, a Shortcuts action.
+
+**Saves**
+- Snapshot before each session; *Time Machine* restores one.
+- Optional backup to your Mac or SFTP server, restored from there. Never touched by updates.
+
+**Sharing** (all off by default, see below)
+- Fetch games from your Mac, an SFTP server, a web library or an archive.
+- Background downloads, speed and time left, pause and resume, differential updates.
+
+**Launcher (Mac)**
+- **Library**: built games, plus those in your games folder that can be built (dashed tiles).
+- **Build**: queue with pause and cancel; the `<title ID>_build` work folder is deleted on success.
+- **Server**: set up your own SFTP server and *Send to my server*, so the Mac need not be on.
+- **Settings → Engine**: pick the engine from a menu (the stable NX2Apple release comes first).
+- **iPhone app**: prepares the memory limit before the first install; gives the SideStore source link.
+- **Saves**: copied by cable, or sent by a paired iPhone.
+
 ## What you need
 
 - Apple silicon Mac, macOS 13+, full Xcode (not just the Command Line Tools).
@@ -62,24 +92,6 @@ Downloads:
 - Mac and web downloads continue while you use another app; SFTP pauses about 30 s after you leave.
 - Everything is verified like a game sent by the Mac. Saves are never touched.
 - A game rebuilt in a newer version shows *Update* and downloads only what changed.
-
-## In the iPhone app
-
-- *Offload* a game to free space; its saves and settings stay.
-- Saves are snapshotted before each session; *Time Machine* restores one. They can also be backed up to your Mac or SFTP server (off by default).
-- Game detail: sessions, average frame rate, last-session chart (frame rate, heat, battery), *Check and repair*.
-- *Cheats*: import an Atmosphère cheat file and switch each cheat on or off.
-- Cloud tiles: **build a game on the Mac from the iPhone**, and follow it in *Activity*.
-- Also: certificate expiry notification, TV out with the phone as the pad, quick actions for recent games, a Shortcuts action.
-
-## In the launcher
-
-- **Library**: your built games, plus those in your games folder that can be built (dashed tiles).
-- **Build**: queue builds; the `<title ID>_build` work folder is deleted on success.
-- **Server**: set up your own SFTP server and *Send to my server*, so the Mac need not be on.
-- **Settings → Engine**: pick the engine from a menu (the stable NX2Apple release comes first).
-- **iPhone app**: prepares the memory limit before the first install; gives the SideStore source link to copy.
-- **Saves**: copied by cable, or sent by a paired iPhone (*Settings → Sharing → Accept copies of saves*).
 
 Design and limits: [`docs/SHARING.md`](docs/SHARING.md).
 
