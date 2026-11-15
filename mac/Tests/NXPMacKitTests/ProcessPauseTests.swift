@@ -8,10 +8,12 @@ import XCTest
 final class ProcessPauseTests: XCTestCase {
     private static let script = "sleep 60 & sleep 60 & i=0; while true; do echo tick $i; i=$((i+1)); sleep 0.05; done"
 
-    private func state(_ pid: pid_t) -> String {
+    private func state(_ pid: pid_t) -> String { ps("stat", pid) }
+
+    private func ps(_ field: String, _ pid: pid_t) -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-o", "stat=", "-p", "\(pid)"]
+        process.arguments = ["-o", "\(field)=", "-p", "\(pid)"]
         let pipe = Pipe()
         process.standardOutput = pipe
         try? process.run()
@@ -25,14 +27,15 @@ final class ProcessPauseTests: XCTestCase {
         let runner = ProcessRunner(executable: URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", Self.script])
         runner.onLine = { lines.add($0) }
         try runner.start()
-        // The two sleepers are the children that stay: the loop's own short sleeps come and go.
+        // The two sleepers are the children that stay: the loop's own short sleeps come and go, so they are picked by
+        // their command, not by position (a short sleep that has exited by the time it is checked has no state to read).
         var sleepers: [pid_t] = []
         let deadline = Date().addingTimeInterval(5)
         var root: pid_t = 0
         while Date() < deadline {
             let all = ProcessTree.descendants(of: pidOf(runner))
             root = all.first ?? 0
-            sleepers = Array(all.dropFirst())
+            sleepers = all.dropFirst().filter { ps("command", $0) == "sleep 60" }
             if lines.count > 3, sleepers.count >= 2 { break }
             usleep(50_000)
         }
