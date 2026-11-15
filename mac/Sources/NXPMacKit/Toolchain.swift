@@ -198,7 +198,6 @@ public enum ToolchainLocator {
             candidates.append(directory.appendingPathComponent("third_party/NX2Apple/engine", isDirectory: true))
             directory = directory.deletingLastPathComponent()
         }
-        candidates.append(fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Documents/decomp/NX2Apple/engine"))
         // The one the setup screen fetches when none of the above is there (`FirstRunSetup.installEngine`).
         candidates.append(SetupPaths.standard.engine)
         return candidates

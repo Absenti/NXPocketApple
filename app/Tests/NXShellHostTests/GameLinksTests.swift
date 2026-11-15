@@ -105,7 +105,7 @@ final class LaunchFromIconTests: XCTestCase {
     func testAScannedPairingLinkOpensASheetAndPairsNothing() async throws {
         let model = await model()
         let pin = String(repeating: "ab", count: 32)
-        let link = PairLink(address: "mac.local", port: 49217, pin: pin, secret: PairingProof.makeSecret(), name: "Momo's Mac")
+        let link = PairLink(address: "mac.local", port: 49217, pin: pin, secret: PairingProof.makeSecret(), name: "Test Mac")
         model.open(try XCTUnwrap(link.url))
         XCTAssertEqual(model.pairLink, link, "the player confirms on the sheet")
         XCTAssertTrue(model.sources.store.records.isEmpty, "nothing is added, and nothing is sent, before that")
