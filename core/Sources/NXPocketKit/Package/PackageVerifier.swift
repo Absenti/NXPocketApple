@@ -70,6 +70,7 @@ public enum PackageVerifier {
             throw NXPocketError(.packageDamaged, "framework \"\(package.framework)\" is not a .framework name.")
         }
 
+        try checkRoot(of: folder, package: package, fileManager: fileManager)
         progress(Progress(fraction: 0.02, detail: "reading \(package.framework)"))
         let frameworkURL = folder.appendingPathComponent(package.framework, isDirectory: true)
         // `fileExists` below follows a link and the scanner only refuses the links it meets *inside* the framework: the
@@ -95,9 +96,8 @@ public enum PackageVerifier {
             guard SafePath.isSafeRelative(entry.path) else {
                 throw NXPocketError(.unsafePath, "the package lists \"\(entry.path)\"", path: name)
             }
-            // Every file is listed with its hash, and `docs/PACKAGE.md` says so: an entry with none used to pass and
-            // switch off the check of that very file, the one thing standing between a swapped executable and the
-            // app's own privileges.
+            // Every file is listed with its hash (`docs/PACKAGE.md`): an entry with none would switch off the check of that very
+            // file, the one thing standing between a swapped executable and the app's own privileges.
             guard entry.size >= 0, FileDigest.isSHA256(entry.sha256) else {
                 throw NXPocketError(.packageDamaged, "\"\(entry.path)\" has no valid sha256.", path: name)
             }
@@ -213,6 +213,24 @@ public enum PackageVerifier {
         return VerifiedPackage(root: folder, package: package, manifest: manifest, titleID: titleID,
                                frameworkURL: frameworkURL, executableURL: executableURL,
                                romfsURL: romfsURL, aocURL: aocURL, codeWarnings: codeWarnings)
+    }
+
+    /// What a package's root may hold: the files the Mac writes, the markers of a transfer and the Finder's files.
+    /// Everything else is refused, and above all a `save*` entry: the import carries the saves of the game it replaces
+    /// by name, so a package that arrived with a `save/` of its own would stand where the player's progress goes, and
+    /// the player's saves would be left behind in the folder that is then deleted.
+    static func checkRoot(of folder: URL, package: GamePackage, fileManager: FileManager) throws {
+        let allowed: Set<String> = [GamePackage.fileName, package.framework, GameLayout.romfsFile, GameLayout.addOnFolder,
+                                    GameLayout.romfsBlocksFile, GameLayout.completeMarker, GameLayout.abandonedMarker, GameLayout.downloadJournal,
+                                    GameLayout.signingRecord]
+        for url in try PackageScanner.children(of: folder, fileManager: fileManager) {
+            let name = url.lastPathComponent
+            guard !allowed.contains(name), !PackageScanner.isFinderMetadata(name) else { continue }
+            if name.lowercased().hasPrefix("save") {
+                throw NXPocketError(.packageInconsistent, "the package holds \"\(name)\", where a game's saves are kept", path: name)
+            }
+            throw NXPocketError(.packageInconsistent, "the package holds \"\(name)\", which is no part of a package", path: name)
+        }
     }
 
     /// `CFBundleExecutable` of the framework's Info.plist; nil when there is no Info.plist or it names none.

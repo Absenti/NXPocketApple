@@ -36,11 +36,10 @@ final class SigningFactsTests: XCTestCase {
         try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: documents) }
         let model = ShellHostModel(documents: documents, engineHost: UnlinkedEngineHost(), signer: UnavailableSigner())
-        model.language = "fr"
         let facts = SigningFacts.make(bundleID: "dev.nxpocketapple.app", signatureIdentifier: "dev.nxpocketapple.app", signatureTeam: nil,
                                       profile: profile, signed: [:])
         let message = model.keychainMessage(KeychainRefusal(status: -34018, account: Keychain.identityAccount), facts: facts)
-        XCTAssertTrue(message.hasPrefix("Le trousseau a refusé le certificat : la signature"), message)
+        XCTAssertTrue(message.hasPrefix("The keychain refused the certificate: the signature"), message)
         XCTAssertTrue(message.contains("(-34018)"))
         XCTAssertTrue(message.contains("profile keychain-access-groups: ABCDE12345.*"))
         XCTAssertTrue(message.contains("signed keychain-access-groups: none"))
@@ -115,7 +114,6 @@ final class PlayTimeTests: XCTestCase {
     func testTheSheetShowsTheTotalAndTheLastDayAndASettingKeepsThem() async throws {
         let model = ShellHostModel(documents: fixture.documents, engineHost: UnlinkedEngineHost(), signer: UnavailableSigner())
         await model.libraryRead()
-        model.language = "fr"
         let game = try XCTUnwrap(model.games.first)
         XCTAssertNil(model.playTime(of: game))
         let opened = model.settings(for: game)

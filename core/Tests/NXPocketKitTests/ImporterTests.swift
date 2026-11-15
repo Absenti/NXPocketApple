@@ -242,6 +242,20 @@ final class GameImporterTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
     }
 
+    func testOnlyTheMarkedAbandonedTransfersGoWhenTheAppAsksOften() throws {
+        let workspace = try TestWorkspace()
+        let importer = try makeImporter(workspace)
+        try workspace.write("Documents/.incoming/live/romfs.img", bytes: 100)
+        try workspace.write("Documents/.incoming/dropped/romfs.img", bytes: 100)
+        try workspace.write("Documents/.incoming/dropped/\(GameLayout.abandonedMarker)", "")
+        try workspace.write("Documents/.incoming/kept/romfs.img", bytes: 100)
+        try workspace.write("Documents/.incoming/kept/\(GameLayout.abandonedMarker)", "")
+        try workspace.write("Documents/.incoming/kept/\(GameLayout.completeMarker)", "")
+        XCTAssertEqual(importer.cleanAbandonedIncoming().map(\.lastPathComponent), ["dropped"])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: workspace.url("Documents/.incoming/live").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: workspace.url("Documents/.incoming/kept").path), "a complete transfer is never taken for a cancelled one")
+    }
+
     func testRemovesAnAbandonedTransferAtOnce() throws {
         let workspace = try TestWorkspace()
         let importer = try makeImporter(workspace)

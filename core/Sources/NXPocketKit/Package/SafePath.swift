@@ -16,6 +16,13 @@ public enum SafePath {
         return true
     }
 
+    /// One name from a server's listing: a single path component, with no separator, no control character, and not `.` or
+    /// `..`. What a source says a file is called is never joined into a path before it passes this.
+    public static func isSafeComponent(_ name: String) -> Bool {
+        !name.isEmpty && name.utf8.count <= 255 && name != "." && name != ".."
+            && !name.unicodeScalars.contains { $0.value < 0x20 || $0.value == 0x7F || $0 == "/" || $0 == "\\" }
+    }
+
     /// Resolves `path` under `root` and checks the result stays there, following symlinks of the parents.
     public static func resolve(_ path: String, under root: URL) -> URL? {
         guard isSafeRelative(path) else { return nil }

@@ -6,12 +6,17 @@ public enum GameLayout {
     public static let incomingFolder = ".incoming"
     /// The complete RomFS image of a game: one file, so it copies at full speed and a partial copy is detectable.
     public static let romfsFile = "romfs.img"
+    /// The hashes of the RomFS image's blocks (`RomfsBlocks`), at the package's root beside it.
+    public static let romfsBlocksFile = "romfs.blocks"
     /// Add-on content, one `<index>.img` per DLC.
     public static let addOnFolder = "aoc"
     /// A Mac app writes this last: the folder is complete and may be imported. A folder without it is a partial transfer.
     public static let completeMarker = ".complete"
     /// A Mac app leaves this, and only this, in a transfer it could not finish: the shell removes such a folder at once.
     public static let abandonedMarker = ".abandoned"
+    /// What the phone's own downloader keeps in a transfer so a pause, a drop or a killed app can be resumed
+    /// (`PackageDownloader`). It is the phone's, never part of a package.
+    public static let downloadJournal = ".download.json"
     public static let signingRecord = ".signing.json"
     public static let launchMarker = ".launching"
     public static let importLog = "import-log.txt"
@@ -20,6 +25,9 @@ public enum GameLayout {
     /// An unfinished transfer in which nothing has changed for this long has lost its sender: it is removed. A live copy
     /// writes every second, over the cable or Wi-Fi alike, so ten minutes of silence is not a pause.
     public static let incomingIdleLimit: TimeInterval = 600
+    /// A download the player paused keeps its gigabytes this long: its journal says it is waiting for the player, not
+    /// for a sender that went away. After that the space is given back.
+    public static let pausedDownloadIdleLimit: TimeInterval = 7 * 24 * 3600
     public static let importLogByteLimit = 256 * 1024
 
     public static func gamesDirectory(in documents: URL) -> URL {

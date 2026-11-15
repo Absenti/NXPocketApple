@@ -11,6 +11,7 @@ gigabytes, and a folder can be copied entry by entry and resumed, where a zip ca
     DmGame                              the executable, signed on the device at import
     ...
   romfs.img                             the complete RomFS image
+  romfs.blocks                          optional: the SHA-256 of each megabyte of romfs.img (see below)
   aoc/                                  optional: add-on content
 ```
 
@@ -43,13 +44,22 @@ Documents/games/0100111000200000/
   "romfs_size": 17179869184,
   "aoc_size": 0,
   "files": [{ "path": "DmGame", "size": 8123456, "sha256": "…" }],
-  "created_by": "nxpocket-desktop 0.1"
+  "created_by": "nxpocket-desktop 0.1",
+  "romfs_blocks": { "block_size": 1048576, "sha256": "…" }
 }
 ```
 
 `files` lists **every** file of the framework with its SHA-256: the framework is small, and it is the part that will
 run with the app's privileges, so it is the part that is checked byte by byte. The game's data is only size-checked
 plus the RomFS identity, because a 15 GB image is never read whole on a phone.
+
+**`romfs.blocks` and `romfs_blocks`** (optional, written by the launcher when it packs a game): `romfs.blocks` is the SHA-256 of every block of
+`romfs.img`, 32 bytes after 32 bytes, the last block as long as it is (480 KB for a 15 GB image at the 1 MiB `block_size`), and
+`romfs_blocks.sha256` is the hash of that file, so the list is as trustworthy as `package.json`, whose own hash is the revision. A
+phone that already holds an older image of the game builds the new one from a clone of it (APFS, no space until a block changes),
+compares each block with the list, and fetches only the blocks that differ, each checked against the list as it arrives
+(`docs/SHARING.md` §16). A package without the list is read as before; an older app refuses a package that has one,
+since its root is not one it knows (rule 12): the launcher and the app are updated together.
 
 `name`, `version`, `chain`, `min_os` and `title_id` are copied from the framework's own `game.manifest.json`, never
 recomputed. A package whose values disagree with that file is refused.
@@ -66,7 +76,7 @@ Cheap checks first, so a bad package is refused before any hashing.
 4. The framework's `game.manifest.json` decodes, and its `title_id`, `name`, `chain` and `min_os` equal the
    package's. Its `framework_executable`, `profile`, `shader_map` and `icon` are relative paths with no `..`; this
    is checked wherever the manifest is read, the launch included. There is no shader chain to compare with the
-   shell's: the engine comes with each game's framework (docs/ENGINE.md).
+   shell's: the engine comes with each game's framework (docs/ARCHITECTURE.md).
 5. `min_os` is not newer than the device.
 6. Every path in `files` is relative, has no `..`, no absolute form and no NUL; no path is listed twice.
 7. Every listed file exists, with exactly the listed size. The executable the manifest names is the one the
@@ -80,9 +90,13 @@ Cheap checks first, so a bad package is refused before any hashing.
     satisfies; every dynamic dependency is under `/usr/lib`, `/System/Library`, `/System/iOSSupport`, or a
     `@rpath`/`@loader_path`/`@executable_path` reference that stays inside the framework.
 11. No other file in the framework starts with a Mach-O magic, and there is no symbolic link anywhere.
-12. `romfs.img` has the listed size and the identity the engine stamped (`RomfsIdentity`, FNV-1a 64 over the header
+12. The package's root holds only `package.json`, the framework, `romfs.img`, `romfs.blocks`, `aoc/`, the markers of a transfer
+    (`.complete`, `.abandoned`, `.download.json`, `.signing.json`) and the Finder's files. Anything else is refused, and an
+    entry named `save…` gets its own message: the import carries the saves of the game it replaces by name, so a package
+    that arrived with a `save/` would stand where the player's progress goes (`PackageVerifier.checkRoot`).
+13. `romfs.img` has the listed size and the identity the engine stamped (`RomfsIdentity`, FNV-1a 64 over the header
     and the index only).
-13. `aoc/` holds exactly `aoc_size` bytes, and nothing when `aoc_size` is 0. Add-on content is not listed file by file.
+14. `aoc/` holds exactly `aoc_size` bytes, and nothing when `aoc_size` is 0. Add-on content is not listed file by file.
 
 Only then is the framework signed, and only after a successful signature is the folder moved into `games/`.
 
@@ -101,6 +115,14 @@ deleted so that it never accumulates:
   nothing in it has changed for ten minutes (`GameLayout.incomingIdleLimit`). Activity is the latest change time of
   anything in the folder, not its modification time: devicectl gives a copied file the modification time it had on
   the Mac.
+
+A download the phone started itself (`PackageDownloader`, from the Mac's library or an SFTP server) ends the same way,
+and is the one transfer whose sender is the phone: it writes `.complete` last, and only after every file of the plan is on
+disk whole. While it is under way the folder holds a `.download.json` (`DownloadJournal`): the source, the game, the
+build, and how far the file in flight is known to be on disk (after an `fsync`, every 64 MiB). With it a pause, a
+dropped connection or a killed app is resumed from that offset, anything past it being thrown away. A folder with a
+journal is a pause, not an abandoned push: the idle clean-up keeps it for seven days
+(`GameLayout.pausedDownloadIdleLimit`) instead of ten minutes. The importer drops a journal that outlived its download.
 
 The shell looks at start, whenever it comes back to the foreground, and after every action. A transfer refused at
 import because of the package itself (a wrong hash, a damaged framework) is deleted too, since importing it again

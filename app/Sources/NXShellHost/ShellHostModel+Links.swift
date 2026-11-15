@@ -9,7 +9,19 @@ extension ShellHostModel {
 
     /// A link the system hands the app. Anything that does not name a game is ignored.
     public func open(_ url: URL) {
+        // A file sent to this app (AirDrop, "Open in…"): never imported at once, the player is asked first, with the warning.
+        if url.isFileURL {
+            var isFolder: ObjCBool = false
+            FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder)
+            archiveRequest = ArchiveRequest(url: url, isFolder: isFolder.boolValue)
+            return
+        }
         guard url.scheme?.lowercased() == GameLink.scheme else { return }
+        if url.host?.lowercased() == PairLink.host {
+            // Never acted on at once: the link only opens a sheet, and the player decides there.
+            if let link = PairLink(url: url) { pairLink = link } else { log.append("ignored a pairing link that is not well formed") }
+            return
+        }
         guard let titleID = GameLink.titleID(from: url) else {
             log.append("ignored a link that names no game")
             return
@@ -60,8 +72,7 @@ extension ShellHostModel {
         while let next = presenter.presentedViewController { presenter = next }
         guard !(presenter is UIAlertController) else { return }
         let running = activeTitleID.map(title(ofTitleID:)) ?? text(.aGame)
-        let question = ShellStrings.closeGameQuestion(running: running, next: title(ofTitleID: titleID.description),
-                                                      language: language)
+        let question = ShellStrings.closeGameQuestion(running: running, next: title(ofTitleID: titleID.description))
         let alert = UIAlertController(title: question.title, message: question.message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: question.confirm, style: .destructive) { [weak self] _ in
             self?.closeForNextGame(titleID)
@@ -90,7 +101,7 @@ extension ShellHostModel {
     public func makeShortcut(_ game: InstalledGame) -> Result<URL, NXPocketError> {
         let name = name(of: game)
         let texts = ShortcutProfile.Texts(label: name,
-                                          displayName: language.hasPrefix("fr") ? "NXPocketApple : \(name)" : "NXPocketApple: \(name)",
+                                          displayName: "NXPocketApple: \(name)",
                                           description: text(.shortcutDescription))
         do {
             let url = try ShortcutProfile.write(game, texts: texts, documents: documents)

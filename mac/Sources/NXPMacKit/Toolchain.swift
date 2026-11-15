@@ -30,9 +30,8 @@ public struct Toolchain: Sendable {
 /// A Python the engine could run in, and what it lacks.
 ///
 /// The engine's build script imports lz4, capstone, fontTools, zbic and a zstd module, and needs nsz for an NSZ or
-/// XCZ game; it stops on the first one missing. The launcher used to take the first Python 3.10 it found
-/// (Homebrew's), which on this machine had none of them: every build failed, an NSZ one with "need the nsz tool in
-/// the current Python". It now takes the first Python 3.12+ that has them all, from the places such a Python lives.
+/// XCZ game; it stops on the first one missing. The launcher takes the first Python 3.12+ that has them all, from the places
+/// such a Python lives.
 public struct PythonEnvironment: Sendable, Equatable {
     public var url: URL
     public var major: Int
@@ -178,6 +177,16 @@ public enum ToolchainLocator {
 
     /// The app bundle is inside the checkout while developing; otherwise look beside the repository.
     public static func defaultEngine() -> EngineLocation {
+        let candidates = engineCandidates()
+        for candidate in candidates {
+            let location = EngineLocation(root: candidate)
+            if location.isUsable { return location }
+        }
+        return candidates.first.map(EngineLocation.init(root:)) ?? .empty
+    }
+
+    /// Every place an engine is looked for, in the order the first usable one is taken when Settings names none.
+    public static func engineCandidates() -> [URL] {
         let fileManager = FileManager.default
         var candidates: [URL] = []
         if let override = ProcessInfo.processInfo.environment["NXPOCKET_ENGINE"], !override.isEmpty {
@@ -192,11 +201,7 @@ public enum ToolchainLocator {
         candidates.append(fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Documents/decomp/NX2Apple/engine"))
         // The one the setup screen fetches when none of the above is there (`FirstRunSetup.installEngine`).
         candidates.append(SetupPaths.standard.engine)
-        for candidate in candidates {
-            let location = EngineLocation(root: candidate)
-            if location.isUsable { return location }
-        }
-        return candidates.first.map(EngineLocation.init(root:)) ?? .empty
+        return candidates
     }
 
     /// Every Xcode the machine has, newest first, so 27.2 can be chosen over the App Store's build.

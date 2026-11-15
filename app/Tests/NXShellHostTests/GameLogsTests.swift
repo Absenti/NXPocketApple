@@ -171,11 +171,10 @@ final class GameLibraryActionsTests: XCTestCase {
     @MainActor
     func testASaveOfAnotherGameIsRefusedInThePlayersWords() async throws {
         let model = await model()
-        model.language = "fr"
         let game = try XCTUnwrap(model.games.first)
         let result = await model.importSaves(game, from: try fixture.macCopy(titleID: "0100222000300000"))
         guard case .failure(let problem) = result else { return XCTFail("imported a save of another game") }
-        XCTAssertEqual(model.text(for: problem), "Cette sauvegarde est celle d'un autre jeu : Fixture (0100222000300000).")
+        XCTAssertEqual(model.text(for: problem), "This save belongs to another game: Fixture (0100222000300000).")
         XCTAssertEqual(fixture.text("save/slot1.bin"), "old slot")
     }
 

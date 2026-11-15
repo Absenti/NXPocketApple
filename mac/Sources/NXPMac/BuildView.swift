@@ -9,6 +9,9 @@ struct BuildView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showLog = false
     @State private var showOptions = false
+    /// The work folders earlier builds left, and the bytes in them (nil until looked at).
+    @State private var leftovers: (count: Int, bytes: Int64)?
+    @State private var cleaning = false
 
     var body: some View {
         RowsPage {
@@ -31,7 +34,28 @@ struct BuildView: View {
                                              set: { model.settings.value.sendAfterBuild = $0 }))
                         .toggleStyle(.switch).labelsHidden()
                 }
+                SettingRow(symbol: "trash", title: "Delete the work folder when a build is done",
+                           detail: "The \"…_build\" folder of the game, with the extracted files and the engine's intermediate work: gigabytes. The built game and your dump are never touched. A build that fails keeps its folder, with its logs.",
+                           detailLines: 3) {
+                    Toggle("", isOn: Binding(get: { model.settings.value.removeBuildFolder }, set: { model.settings.value.removeBuildFolder = $0 }))
+                        .toggleStyle(.switch).labelsHidden()
+                }
+                if let leftovers, leftovers.count > 0 {
+                    SettingRow(symbol: "externaldrive.badge.minus", title: "\(leftovers.count) work folder\(leftovers.count == 1 ? "" : "s") left by earlier builds",
+                               detail: "\(ByteCountFormatter.string(fromByteCount: leftovers.bytes, countStyle: .file)), for games that are built. Nothing else is touched.", detailLines: 2) {
+                        Button(cleaning ? "Deleting…" : "Delete them") {
+                            cleaning = true
+                            Task {
+                                await model.deleteLeftoverBuildFolders()
+                                await refreshLeftovers()
+                                cleaning = false
+                            }
+                        }
+                        .buttonStyle(QuietButtonStyle(large: true)).disabled(cleaning)
+                    }
+                }
             }
+            .task { await refreshLeftovers() }
 
             VStack(alignment: .leading, spacing: 12) {
                 Button {
@@ -51,6 +75,13 @@ struct BuildView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { buildBar }
         .sheet(isPresented: $showLog) { logSheet }
+    }
+
+    private func refreshLeftovers() async {
+        let found = await model.leftoverBuildFolders()
+        var bytes: Int64 = 0
+        for item in found { bytes += item.bytes }
+        leftovers = (found.count, bytes)
     }
 
     private var options: some View {

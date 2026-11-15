@@ -70,9 +70,9 @@ public enum PackageScanner {
     }
 
     /// A folder's entries as the file system has them. Foundation's listing leaves out every `._<name>` file on Apple
-    /// platforms (measured on macOS 27: a folder holding `._other` lists as empty), so such a file, whatever it held,
-    /// went past every check here and was signed with the rest; readdir hides nothing.
-    private static func children(of url: URL, fileManager: FileManager) throws -> [URL] {
+    /// platforms (a folder holding only `._other` lists as empty), so such a file would go past every check here and be
+    /// signed with the rest; readdir hides nothing.
+    static func children(of url: URL, fileManager: FileManager) throws -> [URL] {
         guard let directory = url.withUnsafeFileSystemRepresentation({ $0.flatMap { opendir($0) } }) else { return [] }
         defer { closedir(directory) }
         var children: [URL] = []

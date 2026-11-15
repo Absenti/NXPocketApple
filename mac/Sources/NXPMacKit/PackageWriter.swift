@@ -10,11 +10,8 @@ public struct PackagedGame: Sendable {
 /// Assembles a `<title ID>.nxgame` folder: the framework the engine built, its RomFS image, its add-on content and
 /// the `package.json` the phone verifies before it signs anything.
 ///
-/// It is written whole into `<title ID>.nxgame.partial`, checked there with the phone's own `PackageVerifier`, and
-/// only then put in place of the previous package, by a rename. It used to be written over the previous package entry
-/// by entry: a build cut off while the RomFS image was being copied left the old `package.json` beside new content,
-/// a package that looked ready on the Mac and was refused on the phone; and an `aoc/` of an earlier build stayed when
-/// its DLC were unticked, since nothing cleared it.
+/// Written whole into `<title ID>.nxgame.partial`, checked there with the phone's own `PackageVerifier`, then swapped in by
+/// a rename: a build cut off halfway never leaves the old `package.json` beside new content, nor an old `aoc/` behind.
 public enum PackageWriter {
     public static let createdBy = "nxpocket-desktop 0.1"
     public static let partialSuffix = ".partial"
@@ -105,6 +102,15 @@ public enum PackageWriter {
             try fileManager.copyItem(at: romfsImage, to: folder.appendingPathComponent(GameLayout.romfsFile))
         }
 
+        // The hash of every megabyte of the image, so that an update of this game on a phone that has it fetches only what changed.
+        var romfsBlocks: RomfsBlocks?
+        if romfsSize > 0 {
+            progress(Progress(fraction: 0.78, detail: "hashing the blocks of \(GameLayout.romfsFile)"))
+            let list = try RomfsBlocks.digests(of: folder.appendingPathComponent(GameLayout.romfsFile))
+            try list.write(to: folder.appendingPathComponent(GameLayout.romfsBlocksFile), options: .atomic)
+            romfsBlocks = RomfsBlocks(sha256: FileDigest.sha256(of: list))
+        }
+
         var aocSize: Int64 = 0
         if let aocFolder {
             let target = folder.appendingPathComponent(GameLayout.addOnFolder, isDirectory: true)
@@ -121,7 +127,7 @@ public enum PackageWriter {
                                   packageVersion: manifest.packageVersion, framework: name,
                                   chain: manifest.chain, minOS: manifestOS.description,
                                   romfsID: romfsIdentity, romfsSize: romfsSize, aocSize: aocSize,
-                                  files: entries, createdBy: createdBy)
+                                  files: entries, createdBy: createdBy, romfsBlocks: romfsBlocks)
         try package.data().write(to: folder.appendingPathComponent(GamePackage.fileName), options: .atomic)
         return package
     }

@@ -21,8 +21,7 @@ public struct LogFile: Identifiable, Hashable, Sendable {
     }
 }
 
-/// Each start of a game writes its own log, `Documents/logs/<title ID>/<yyyy-MM-dd HHmmss>.txt`, where one shared
-/// `log.txt` used to be overwritten by the next start of any game. The newest `keep` of each game stay.
+/// Each start of a game writes its own log, `Documents/logs/<title ID>/<yyyy-MM-dd HHmmss>.txt`. The newest `keep` of each game stay.
 public enum GameLogs {
     public static let folderName = "logs"
     public static let keep = 10

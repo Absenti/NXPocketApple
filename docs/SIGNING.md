@@ -82,7 +82,7 @@ and refuses to sign rather than leaving behind a framework iOS would reject.
 Three things that only showed up once the real API was read, and that the earlier draft of this document got wrong:
 
 - **LiveContainer's `ZSign/` directory is AGPL-3.0**, not a source NXPocketApple may take code from. It implements the
-  same API, but this project is MIT and PLAN.md forbids AGPL outright. The shim calls zsign's own C++ API instead.
+  same API, but this project is MIT and AGPL code is excluded outright. The shim calls zsign's own C++ API instead.
 - **zsign takes the team ID and the entitlements from the provisioning profile, not from the certificate.** Signing
   with a `.p12` alone fails with `Can't find TeamId!`. The app must therefore pass its own `embedded.mobileprovision`,
   which it has in its bundle. This also means the team check is structural rather than a courtesy: what ends up in the
@@ -167,7 +167,7 @@ would have caught:
   `Unknown issuer hash`. Sandboxed exports from SideStore and AltStore carry the WWDR intermediate for exactly this
   reason, so this is a constraint on the certificate the user imports, not on the code.
 - **What the entitlements are is a choice the signer makes explicitly.** zsign takes them from the provisioning
-  profile unless a file overrides them. The first design passed an empty dict, following PLAN.md's "a framework
+  profile unless a file overrides them. The first design passed an empty dict, following the first design's "a framework
   carries none"; the device proved that rule wrong (5A against 5C above), and the default is now the profile's.
   The empty dict stays available as `.none`, for the tests.
 - **A framework needs its resource seal.** `codesign` refuses a bundle whose signature carries a resources slot but

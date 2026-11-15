@@ -102,6 +102,27 @@ final class LaunchFromIconTests: XCTestCase {
     }
 
     @MainActor
+    func testAScannedPairingLinkOpensASheetAndPairsNothing() async throws {
+        let model = await model()
+        let pin = String(repeating: "ab", count: 32)
+        let link = PairLink(address: "mac.local", port: 49217, pin: pin, secret: PairingProof.makeSecret(), name: "Momo's Mac")
+        model.open(try XCTUnwrap(link.url))
+        XCTAssertEqual(model.pairLink, link, "the player confirms on the sheet")
+        XCTAssertTrue(model.sources.store.records.isEmpty, "nothing is added, and nothing is sent, before that")
+        XCTAssertFalse(model.sources.enabled, "network sources stay off until the player confirms")
+        XCTAssertEqual(model.launch, .idle)
+    }
+
+    @MainActor
+    func testAPairingLinkThatIsNotWellFormedIsIgnored() async throws {
+        let model = await model()
+        model.open(URL(string: "nxpocket://pair?h=mac.local&p=49217&k=nope&s=nope")!)
+        model.open(URL(string: "nxpocket://pair")!)
+        XCTAssertNil(model.pairLink)
+        XCTAssertEqual(model.launch, .idle)
+    }
+
+    @MainActor
     func testANextLaunchLeftByASwitchStartsItsGameOnceTheFirstScreenIsUp() async throws {
         try NextLaunch.write(fixture.game.titleID, documents: fixture.documents)
         let model = await model()
@@ -296,7 +317,6 @@ final class SwitchGameTests: XCTestCase {
         defer { host.window.isHidden = true }
         let model = ShellHostModel(documents: fixture.documents, engineHost: host, signer: UnavailableSigner())
         await model.libraryRead()
-        model.language = "fr"
         model.rename(try XCTUnwrap(model.games.first), to: "South Park")
         model.activeTitleID = LibraryFixture.titleID
         model.launch = .running("South Park")
@@ -306,11 +326,11 @@ final class SwitchGameTests: XCTestCase {
 
         model.open(URL(string: "nxpocket://play/0100222000300000")!)
         let alert = try XCTUnwrap(host.window.rootViewController?.presentedViewController as? UIAlertController)
-        XCTAssertEqual(alert.title, "Fermer South Park ?")
-        XCTAssertEqual(alert.actions.map(\.title), ["Fermer South Park", model.text(.cancel)])
+        XCTAssertEqual(alert.title, "Close South Park?")
+        XCTAssertEqual(alert.actions.map(\.title), ["Close South Park", model.text(.cancel)])
         XCTAssertEqual(alert.actions.first?.style, .destructive)
-        XCTAssertEqual(alert.message, "0100222000300000 s'ouvrira quand tu toucheras de nouveau son icône. "
-                                      + "Ce que South Park n'a pas sauvegardé sera perdu.")
+        XCTAssertEqual(alert.message, "0100222000300000 opens when you touch its icon again. "
+                                      + "Whatever South Park has not saved will be lost.")
         alert.dismiss(animated: false)
     }
 }

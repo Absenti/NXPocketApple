@@ -29,7 +29,7 @@ private enum GameStatus: Equatable {
 }
 
 private enum LibraryFilter: String, CaseIterable, Identifiable {
-    case all = "All", onPhone = "On iPhone", toSend = "To send", broken = "To rebuild"
+    case all = "All", onPhone = "On iPhone", toSend = "To send", toBuild = "To build", broken = "To rebuild"
     var id: String { rawValue }
 }
 
@@ -39,6 +39,8 @@ struct LibraryView: View {
     @State private var picked: Set<String> = []
     /// The game the inspector shows.
     @State private var focusID: String?
+    /// The game of the games folder the inspector shows, when a "to build" tile is the one selected.
+    @State private var focusBuildID: String?
     @State private var filter: LibraryFilter = .all
     @State private var query = ""
     /// The package the user asked to delete, until they confirm.
@@ -66,7 +68,7 @@ struct LibraryView: View {
                             Text(Friendly.text(problem)).font(.system(size: 11)).foregroundStyle(Ink.bad).textSelection(.enabled)
                                 .padding(.horizontal, 28).padding(.bottom, 8)
                         }
-                        if model.games.isEmpty {
+                        if model.games.isEmpty && model.buildableGames.isEmpty {
                             empty
                         } else {
                             ScrollView {
@@ -81,6 +83,13 @@ struct LibraryView: View {
                                         .accessibilityLabel("\(game.title), \(status(of: game).label)")
                                         .contextMenu { menu(for: game) }
                                     }
+                                    ForEach(shownBuildable) { game in
+                                        Button { tapBuildable(game) } label: {
+                                            BuildableTile(game: game, item: model.buildItem(game.titleID), selected: focusBuildID == game.titleID)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel("\(game.name), to build")
+                                    }
                                 }
                                 .padding(.horizontal, 28)
                                 .padding(.top, 6)
@@ -92,7 +101,10 @@ struct LibraryView: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                if let game = focused {
+                if let id = focusBuildID, let game = model.buildableGames.first(where: { $0.titleID == id }) {
+                    Divider().overlay(Ink.line)
+                    BuildInspector(game: game, theme: theme).frame(width: 320)
+                } else if let game = focused {
                     Divider().overlay(Ink.line)
                     Inspector(game: game, status: status(of: game), theme: theme, onRename: { startRename(game) }, onDelete: { deleting = game })
                         .frame(width: 320)
@@ -107,6 +119,14 @@ struct LibraryView: View {
                 .animation(.easeInOut(duration: 0.5), value: focused?.id)
         }
         .sheet(item: $renaming) { game in renameSheet(game) }
+        .alert("The archive is ready", isPresented: Binding(get: { model.archiveResult != nil }, set: { if !$0 { model.archiveResult = nil } }),
+               presenting: model.archiveResult) { result in
+            Button("Copy the SHA-256") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(result.sha256, forType: .string) }
+            Button("Show in Finder") { model.revealInFinder(result.url) }
+            Button("Done", role: .cancel) {}
+        } message: { result in
+            Text("\(result.url.lastPathComponent) · \(ByteCountFormatter.string(fromByteCount: result.bytes, countStyle: .file))\n\nSHA-256\n\(result.sha256)\n\nPut it behind a link only you know, then give the iPhone the link and this hash: it checks the hash before it unpacks anything.")
+        }
         .confirmationDialog(deleting.map { "Move \($0.title) to the Trash?" } ?? "",
                             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                             titleVisibility: .visible, presenting: deleting) { game in
@@ -148,7 +168,8 @@ struct LibraryView: View {
     }
 
     private func count(_ filter: LibraryFilter) -> Int {
-        model.games.filter { matches($0, filter) }.count
+        if filter == .toBuild { return model.buildableGames.count }
+        return model.games.filter { matches($0, filter) }.count
     }
 
     private func matches(_ game: LocalGame, _ filter: LibraryFilter) -> Bool {
@@ -159,6 +180,7 @@ struct LibraryView: View {
             let state = status(of: game)
             return state == .toSend || state == .update
         case .broken: return status(of: game) == .broken
+        case .toBuild: return false
         }
     }
 
@@ -173,9 +195,21 @@ struct LibraryView: View {
 
     private var readyGames: [LocalGame] { model.games.filter(\.isReady) }
 
+    /// The games of the folder that can be built, for the "All" and "To build" lists.
+    private var shownBuildable: [FolderGame] {
+        guard filter == .all || filter == .toBuild else { return [] }
+        return model.buildableGames.filter { query.isEmpty || model.displayName(titleID: $0.titleID, own: $0.name).localizedCaseInsensitiveContains(query) }
+    }
+
+    private func tapBuildable(_ game: FolderGame) {
+        focusBuildID = game.titleID
+        picked = []
+    }
+
     private func tap(_ game: LocalGame) {
         let flags = NSEvent.modifierFlags
         focusID = game.id
+        focusBuildID = nil
         if flags.contains(.command) || flags.contains(.shift) {
             if picked.contains(game.id) { picked.remove(game.id) } else { picked.insert(game.id) }
         } else {
@@ -193,7 +227,8 @@ struct LibraryView: View {
     private var topBar: some View {
         HStack(spacing: 12) {
             PageTitle(title: "Library", size: 34,
-                      subtitle: "\(model.games.count) \(model.games.count == 1 ? "game" : "games") · \(totalSize)")
+                      subtitle: "\(model.games.count) \(model.games.count == 1 ? "game" : "games") · \(totalSize)"
+                          + (model.buildableGames.isEmpty ? "" : " · \(model.buildableGames.count) to build"))
             Spacer(minLength: 12)
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Ink.secondary)
@@ -352,6 +387,18 @@ struct LibraryView: View {
             Button("Cancel sending") { model.cancelItem(item.id) }
         } else if let device = model.selectedDevice, game.isReady {
             Button("Send to \(device.name)") { model.queueSend(game, to: device) }
+        }
+        if let fraction = model.uploads[game.titleID] {
+            Button("Cancel sending to my server (\(Int(fraction * 100))%)") { model.cancelUpload(game.titleID) }
+        } else if model.serverIsSetUp, game.isReady {
+            Button("Send to my server") { model.uploadToServer(game) }
+        } else if game.isReady {
+            Button("Set up a server to send to…") { model.screen = .server }
+        }
+        if let fraction = model.archiving[game.titleID] {
+            Button("Cancel the archive (\(Int(fraction * 100))%)") { model.cancelArchive(game.titleID) }
+        } else if game.isReady {
+            Button("Export as an archive…") { model.exportArchive(game) }
         }
         if game.isReady {
             Button("Rename…") { startRename(game) }
@@ -587,5 +634,121 @@ private struct StatusPill: View {
         Text(status.label).font(.system(size: 11, weight: .bold)).foregroundStyle(status.color)
             .padding(.horizontal, 9).frame(height: 22)
             .background(status.color.opacity(0.14), in: Capsule())
+    }
+}
+
+/// A game of the games folder that is not built yet: its picture from the dump, a dashed outline, and where its build stands.
+private struct BuildableTile: View {
+    @EnvironmentObject private var model: AppModel
+    let game: FolderGame
+    let item: QueueItem?
+    let selected: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .bottomLeading) {
+                BuildableCover(game: game, radius: 22).aspectRatio(1, contentMode: .fit)
+                if let item, item.phase.isActive {
+                    Bar(fraction: item.fraction).padding(10)
+                } else {
+                    chip(item == nil ? "To build" : "Queued", Ink.accent).padding(10)
+                }
+            }
+            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(selected ? Ink.accent : Ink.line.opacity(1.8), style: StrokeStyle(lineWidth: selected ? 2 : 1.2, dash: selected ? [] : [5, 4]))
+                .padding(selected ? -4 : 0))
+            Text(model.displayName(titleID: game.titleID, own: game.name)).font(.system(size: 13.5, weight: .bold)).tracking(-0.2)
+                .foregroundStyle(Ink.primary).lineLimit(1).padding(.top, 10)
+            Text(game.summary).font(.system(size: 11.5)).foregroundStyle(Ink.secondary).lineLimit(1)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func chip(_ text: String, _ color: Color) -> some View {
+        Text(text).font(.system(size: 11, weight: .bold)).foregroundStyle(color)
+            .padding(.horizontal, 9).frame(height: 22)
+            .background(Color(red: 0.055, green: 0.055, blue: 0.070).opacity(0.86), in: Capsule())
+            .overlay(Capsule().strokeBorder(color.opacity(0.8)))
+    }
+}
+
+private struct BuildableCover: View {
+    let game: FolderGame
+    var radius: CGFloat
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Ink.surface)
+            if let icon = IconCache.image(key: "folder-\(game.titleID)", data: game.icon) {
+                Image(nsImage: icon).resizable().interpolation(.high).aspectRatio(contentMode: .fill).opacity(0.85)
+            } else {
+                Image(systemName: "shippingbox").font(.system(size: 34, weight: .light)).foregroundStyle(Ink.secondary)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+    }
+}
+
+/// The selected game of the folder: what was found for it, and the button that builds it.
+private struct BuildInspector: View {
+    @EnvironmentObject private var model: AppModel
+    let game: FolderGame
+    let theme: GameTheme
+
+    private var item: QueueItem? { model.buildItem(game.titleID) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    BuildableCover(game: game, radius: 32)
+                        .frame(width: 236, height: 236)
+                        .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).strokeBorder(Ink.line.opacity(1.8), style: StrokeStyle(lineWidth: 1.2, dash: [6, 5])))
+                        .shadow(color: .black.opacity(0.5), radius: 24, y: 14)
+                        .frame(maxWidth: .infinity, minHeight: 250)
+                    Text(model.displayName(titleID: game.titleID, own: game.name)).font(.system(size: 25, weight: .heavy)).tracking(-0.8)
+                        .foregroundStyle(Ink.primary).lineLimit(2).fixedSize(horizontal: false, vertical: true).padding(.top, 10)
+                    Card(padding: 14) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            row("Found", game.summary)
+                            if let base = game.base { row("Base game", base.package.url.lastPathComponent) }
+                            if let version = model.selectedVersionTag(of: game) { row("Version to build", version) }
+                        }
+                    }
+                    .padding(.top, 16)
+                    Text("Not built yet. A build takes a while and needs room for the game's decompressed copy.")
+                        .font(.system(size: 11.5)).foregroundStyle(Ink.secondary).fixedSize(horizontal: false, vertical: true).padding(.top, 12)
+                }
+                .padding(.horizontal, 22).padding(.vertical, 22)
+            }
+            VStack(spacing: 10) {
+                if let item, item.phase.isActive {
+                    Button {} label: { Text("Building · \(Int(item.fraction * 100))%").frame(maxWidth: .infinity) }
+                        .buttonStyle(PrimaryButtonStyle(large: true, fill: theme.fill)).disabled(true)
+                    Button("Cancel") { model.cancelItem(item.id) }.buttonStyle(QuietButtonStyle(large: true))
+                } else if item != nil {
+                    Button {} label: { Text("Waiting in the queue").frame(maxWidth: .infinity) }
+                        .buttonStyle(PrimaryButtonStyle(large: true, fill: theme.fill)).disabled(true)
+                } else {
+                    Button { model.buildFromLibrary(game) } label: { Text("Build this game").frame(maxWidth: .infinity) }
+                        .buttonStyle(PrimaryButtonStyle(large: true, fill: theme.fill))
+                    if !game.updates.isEmpty || !game.dlc.isEmpty {
+                        Button("Choose updates and DLC…") { model.screen = .build }.buttonStyle(QuietButtonStyle(large: true))
+                    }
+                }
+            }
+            .padding(.horizontal, 22).padding(.top, 14).padding(.bottom, 18)
+            .background(Ink.surface)
+            .overlay(alignment: .top) { Divider().overlay(Ink.line) }
+        }
+        .background(Ink.background)
+    }
+
+    private func row(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .top) {
+            Text(label).font(.system(size: 12.5)).foregroundStyle(Ink.secondary)
+            Spacer(minLength: 8)
+            Text(value).font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Ink.primary).multilineTextAlignment(.trailing).lineLimit(2)
+        }
     }
 }

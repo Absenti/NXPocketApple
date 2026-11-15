@@ -61,7 +61,8 @@ public struct EngineLaunchPlan: Sendable {
         if let aoc = first([game.aocURL, folder.appendingPathComponent("aoc", isDirectory: true)]) {
             environment["DM_AOC_DIR"] = aoc.path
         }
-        environment["DM_CHEATS"] = folder.appendingPathComponent("cheats", isDirectory: true).path
+        // Outside the game's folder, which an update or an offload replaces: the cheats are the player's, like the saves.
+        environment["DM_CHEATS"] = Cheats.folder(titleID: game.id, documents: documents).path
         environment["DM_FONT_DIR"] = appResources.appendingPathComponent("dm/font", isDirectory: true).path
         // The shell already showed its own library, so the per-game launcher screen stays out of the way.
         environment["DM_LAUNCHER"] = "0"

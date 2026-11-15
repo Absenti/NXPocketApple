@@ -28,15 +28,16 @@ public enum PhoneAppDownload {
     }
 
     /// Puts the launcher's own copy of the IPA at `destination` when none is there or the one there is older, so the
-    /// iPhone app is available before any release has been downloaded. A newer copy (downloaded or built here) is kept.
+    /// iPhone app is available before any release has been downloaded. A newer copy (downloaded or built here, by version, then by date) is kept.
     /// Returns the copy now in place when it changed, nil otherwise.
     @discardableResult
     public static func seed(from bundled: URL, to destination: URL) -> PhoneAppIPA? {
         guard let source = PhoneAppBuild.inspect(bundled), source.bundleID == bundleID else { return nil }
         let fileManager = FileManager.default
+        // Two builds of the same version are told apart by their date (the bundled copy keeps the date it was built): the newer one stays.
         if let have = PhoneAppBuild.inspect(destination), have.bundleID == bundleID,
            let haveVersion = have.version.flatMap(SemanticVersion.init), let sourceVersion = source.version.flatMap(SemanticVersion.init),
-           haveVersion >= sourceVersion { return nil }
+           haveVersion > sourceVersion || (haveVersion == sourceVersion && have.date >= source.date) { return nil }
         do {
             try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             let staging = destination.deletingLastPathComponent().appendingPathComponent(".NXPocketApple-\(UUID().uuidString).ipa")

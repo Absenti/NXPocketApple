@@ -76,6 +76,13 @@ struct QueueView: View {
                     .buttonStyle(.plain).foregroundStyle(Ink.secondary).help("Remove from the list")
                 }
             }
+            if case .failed(let reason) = item.phase, AppModel.staleProfileFolder(in: reason) != nil {
+                HStack(spacing: 8) {
+                    Button("Survey the update") { model.surveyUpdate(item.id) }.buttonStyle(PrimaryButtonStyle())
+                        .help("The engine kept its profile of an older version of this game. This puts it aside (nothing is deleted) and builds again, so the engine surveys the version in your folder.")
+                }
+                .padding(.leading, 52)
+            }
             if case .needsAnswer = item.phase {
                 HStack(spacing: 8) {
                     Button("Send anyway") { model.answer(item.id, sendAnyway: true) }.buttonStyle(PrimaryButtonStyle())

@@ -73,6 +73,8 @@ public struct ShellPill: View {
     public var body: some View {
         Text(text)
             .font(.system(size: 11, weight: .medium))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(color.opacity(0.16), in: Capsule())
@@ -116,8 +118,11 @@ public struct ShellButtonStyle: ButtonStyle {
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(ShellFont.body(15, prominent ? .bold : .semibold))
-            .padding(.horizontal, 16)
+            .font(ShellFont.body(14, prominent ? .bold : .semibold))
+            // A label stays on one line: a long one shrinks a little rather than breaking in the middle of a button.
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .frame(maxWidth: prominent ? .infinity : nil)
             .background(prominent ? (fill ?? ShellInk.deep) : ShellInk.raised,

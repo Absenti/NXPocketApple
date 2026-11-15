@@ -53,6 +53,39 @@ final class TransferWatchTests: XCTestCase {
     }
 
     @MainActor
+    func testATransferThatStopsGrowingIsCalledStoppedAndCanBeDeleted() throws {
+        let saved = ShellHostModel.stalledAfter
+        ShellHostModel.stalledAfter = 0
+        defer { ShellHostModel.stalledAfter = saved }
+        let model = ShellHostModel(documents: documents, engineHost: UnlinkedEngineHost(), signer: UnavailableSigner())
+        let folder = try transfer(romfsBytes: 100)
+        model.checkTransfers()
+        XCTAssertEqual(model.receiving.count, 1)
+        model.checkTransfers()
+        XCTAssertTrue(model.receiving.first?.stalled == true, "the same byte count twice, with no time allowed")
+        // More bytes arrive: it is on its way again.
+        try Data(count: 500).write(to: folder.appendingPathComponent("romfs.img"))
+        ShellHostModel.stalledAfter = 3600
+        model.checkTransfers()
+        XCTAssertTrue(model.receiving.first?.stalled == false)
+        model.discardTransfer(folder.lastPathComponent)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+        XCTAssertTrue(model.receiving.isEmpty)
+    }
+
+    @MainActor
+    func testATransferTheMacCancelledIsRemovedWhileTheAppIsOpen() throws {
+        let model = ShellHostModel(documents: documents, engineHost: UnlinkedEngineHost(), signer: UnavailableSigner())
+        let folder = try transfer(romfsBytes: 100)
+        model.checkTransfers()
+        XCTAssertEqual(model.receiving.count, 1)
+        try Data("x\n".utf8).write(to: folder.appendingPathComponent(GameLayout.abandonedMarker))
+        model.checkTransfers()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path), "the Mac's cancel does not wait for the next start")
+        XCTAssertTrue(model.receiving.isEmpty)
+    }
+
+    @MainActor
     func testATransferThatLandsWhileTheAppIsOpenShowsWithoutARelaunch() throws {
         let model = ShellHostModel(documents: documents, engineHost: UnlinkedEngineHost(), signer: UnavailableSigner())
         guard model.signingIdentity == nil else { throw XCTSkip("a certificate is installed in this keychain") }

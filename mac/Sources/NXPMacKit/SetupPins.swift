@@ -164,19 +164,11 @@ backports.zstd==1.8.0 ; python_version < "3.14" \
     // MARK: - The engine
 
     public static let nx2appleRepository = "https://github.com/LNPANDY/NX2Apple.git"
-    /// The NX2Apple commit whose `tools/engine.py sync` gives the engine this project's builds are made with: the stable
-    /// release v1.4.0 (2026-11-12), which is nxnative at ccd834e0 plus NX2Apple's 91 patches. The pin before it was 36131205
-    /// (v1.3.0-rc6 and one commit: nxnative f25fa956 plus 63 patches, key c65b42ce…).
-    ///
-    /// v1.5.0 (0e866231, nxnative 0c078130, key 7003d383…) was out the next day, tagged `v1.5.0-rc1`: not taken, a stable pin
-    /// is what the launcher installs for everyone. It changes the shader chain too (`a5e7fb6e4fa4`).
-    ///
-    /// Moved without a build of a game with the new engine: what was checked is only what can be read. The glue version
-    /// the framework exports (`DM_GLUE_VERSION`) is 1 in the series, `--shell-framework` and the other options the launcher
-    /// passes are all still there, the engine's messages still carry the clock `EngineBuilder.withoutClock` strips, the
-    /// Python requirements did not change, and the post-build cleanup of "duplicate romfs.img" (#1146, #1148) is in
-    /// NX2Apple's own launcher, not in the engine. Builds are not reused from the previous engine's caches whose shader
-    /// chain differs: their shaders are compiled again.
+    /// The release the pin is, for the screens that name it.
+    public static let nx2appleVersion = "1.4.0"
+    /// The NX2Apple commit whose `tools/engine.py sync` gives the engine builds are made with: the latest stable release
+    /// (v1.4.0: nxnative ccd834e0 plus 91 patches). A release candidate is never pinned, since the launcher installs this for
+    /// everyone. Each engine has its own shader chain, so a game built with another engine compiles its shaders again.
     public static let nx2appleRevision = "97ba00eb64e60037e173856197dce291b38bb3b3"
     /// The `key` line `engine.py sync` writes into `engine/.git/nx2apple-stamp` for that commit: the digest of the pin
     /// and of every patch (and of `patches/fork_env_switches.tsv` when the series has one, which this one does not). An

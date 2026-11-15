@@ -47,16 +47,19 @@ public final class ImportService: @unchecked Sendable {
 
     /// Imports every finished transfer and says what became of each: a refusal of one does not hide the others, and any
     /// error, not only the importer's own, is a refusal of that transfer rather than the end of the pass.
-    public func importEach(identity: SigningIdentity?, options: ImportOptions = .default,
+    public func importEach(identity: SigningIdentity?, options: ImportOptions = .default, skipping: Set<String> = [],
                            progress: (Progress) -> Void = { _ in }) throws -> Report {
         guard let identity else {
             throw NXPocketError(.noCertificate, "import a certificate before importing a game")
         }
         var report = Report()
-        let folders = pending()
+        let folders = pending().filter { !skipping.contains($0.lastPathComponent) }
         for (index, folder) in folders.enumerated() {
             progress(Progress(stage: .verifying, fraction: Double(index) / Double(max(folders.count, 1)),
                               detail: folder.lastPathComponent))
+            // Written before the import and removed after it, however it ends: what is left is an import the app did not survive.
+            ImportGuard.begin(folder.lastPathComponent, in: documents)
+            defer { ImportGuard.end(in: documents) }
             do {
                 report.imported.append(try importer.install(folder, identity: identity, signer: signer,
                                                             options: options,

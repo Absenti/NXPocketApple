@@ -11,7 +11,7 @@
 #        tools/build_mac.sh --check <binary>   only the check
 #
 # The .app: bundle ID dev.nxpocket.launcher, CFBundleShortVersionString from VERSION at the repository root (a
-# release is tag v<VERSION>), CFBundleVersion from BUILD_NUMBER (default 1), LSMinimumSystemVersion the one the
+# release is tag v<VERSION>), CFBundleVersion from BUILD_NUMBER (default: the date), LSMinimumSystemVersion the one the
 # executable records. Its icon is mac/Resources/AppIcon.icns if there is one, else made from the iPhone app's.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -52,7 +52,7 @@ die() { echo "FAIL $*" >&2; exit 1; }
 [ -f "$ROOT/VERSION" ] || die "no VERSION file at the repository root"
 VERSION=$(tr -d '[:space:]' < "$ROOT/VERSION")
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || die "VERSION is \"$VERSION\", not a version like 0.2.0"
-BUILD=${BUILD_NUMBER:-1}
+BUILD=${BUILD_NUMBER:-$(date +%y%m%d.%H%M)}
 [[ "$BUILD" =~ ^[0-9]+(\.[0-9]+)*$ ]] || die "BUILD_NUMBER is \"$BUILD\", not a number"
 MINOS=$(otool -l "$BINARY" | awk '/cmd LC_BUILD_VERSION/ { f = 1 } f && $1 == "minos" { print $2; exit }')
 [ -n "$MINOS" ] || die "$BINARY records no minimum macOS"
@@ -89,7 +89,8 @@ if [ -f "$BUNDLED_IPA" ]; then
     elif [ "$IPA_VERSION" != "$VERSION" ]; then
         echo "iphone:   $BUNDLED_IPA is version ${IPA_VERSION:-?}, this launcher is $VERSION: left out (build the iPhone app again)"
     else
-        cp "$BUNDLED_IPA" "$APP/Contents/Resources/NXPocketApple.ipa"
+        # -p: the copy keeps the date the IPA was built, which is how the launcher tells two builds of one version apart.
+        cp -p "$BUNDLED_IPA" "$APP/Contents/Resources/NXPocketApple.ipa"
         echo "iphone:   $BUNDLED_IPA is inside the app"
     fi
 fi

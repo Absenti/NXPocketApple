@@ -4,7 +4,7 @@
 #   tools/build_app.sh --sim                 an app for the iOS Simulator (no signature is enforced there)
 #   tools/build_app.sh --device-unsigned     an unsigned IPA (CODE_SIGNING_ALLOWED=NO, then ad-hoc), for SideStore
 #
-# The engine is not linked into the app: each game's framework carries its own host (docs/ENGINE.md). The app only
+# The engine is not linked into the app: each game's framework carries its own host (docs/ARCHITECTURE.md). The app only
 # carries the shared-font stand-ins, made below from a free font.
 #
 # The app is an XcodeGen project over the SwiftPM package in app/. Regenerate with:
@@ -17,6 +17,9 @@ DD=${NXPOCKET_DERIVED:-$APP/.builddd}
 SIM_NAME=${NXPOCKET_SIM:-iPhone 17}
 OUT=${NXPOCKET_OUTPUT:-$HOME/Documents/NXPocket}
 MODE=${1:---sim}
+# A build made here is told apart from the one before it by its build number (CI gives its own run number): the date, so a store or
+# the launcher never mistakes a new local build for the old one.
+export BUILD_NUMBER=${BUILD_NUMBER:-$(date +%y%m%d.%H%M)}
 
 say() { printf '\033[1m%s\033[0m\n' "$*"; }
 die() { printf '\033[31mFAIL: %s\033[0m\n' "$*" >&2; exit 1; }

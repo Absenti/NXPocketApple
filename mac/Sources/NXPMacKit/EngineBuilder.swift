@@ -111,10 +111,8 @@ public enum EngineEventParser {
 /// What the build screen shows from the engine's events: the stage as "k/n name", the bar of that stage, the bar of
 /// the whole build, and under them the step and its count. Each stage, and each step, starts its own bar from zero.
 ///
-/// The engine already sends a count change at most twice a second, so every progress event is shown. The screen
-/// used to skip any value that was not 1% above the last one shown, and never reset that at a new stage: the engine
-/// caps a stage at 0.99, so after the first stage that got there, every later one stayed at 0% (a 14,388-shader
-/// compile showed 0% at 97%). Many stages carry no count at all (the extraction of a version, the framework's Xcode
+/// The engine sends a count change at most twice a second, so every progress event is shown, and each stage starts its
+/// own bar from zero (it caps a stage at 0.99). Many stages carry no count at all (an extraction, the framework's Xcode
 /// build), so their own bar cannot move: the whole build's bar, stage k of n, moves at each of them.
 public struct BuildProgress: Equatable, Sendable {
     public private(set) var stage: String
@@ -245,9 +243,7 @@ public final class EngineBuilder: @unchecked Sendable {
     /// What the engine left behind: `<staging>/DmGame<title ID>.framework`, the RomFS image its `game files:` line
     /// named, and its `aoc/` when this run had DLC.
     ///
-    /// The image comes from that line only. The launcher used to fall back on the newest `romfs.img` under the build
-    /// folder, which with several versions extracted and none rewritten by this run can be another version's, packed
-    /// without a word; the line is now always read, since the runner delivers every line before the end.
+    /// The image comes from that line only: the newest `romfs.img` under the build folder could be another version's.
     public func outputs(for request: EngineBuildRequest, reportedRomfs: URL?) throws -> EngineBuildOutput {
         guard let framework = Self.framework(in: request.stagingFolder) else {
             throw NXPocketError(.engineFailed, "the engine produced no framework in \(request.stagingFolder.path)")

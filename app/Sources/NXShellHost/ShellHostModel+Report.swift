@@ -73,11 +73,22 @@ extension ShellHostModel {
 
     // MARK: - Play time
 
-    /// "3 h 12 min" and the day the game was last played, in the player's language; nil before the first game.
+    func lastSession(of game: InstalledGame) -> SessionReport? {
+        SessionReport.load(titleID: game.id, documents: documents).flatMap { $0.buckets.count >= 2 ? $0 : nil }
+    }
+
+    /// Sessions and average frame rate of a game, from what `PlayClock` kept; nil before the first session.
+    func playStats(of game: InstalledGame) -> PlayStats? {
+        let choices = GameChoices.load(titleID: game.id, documents: documents)
+        guard choices.sessions > 0 else { return nil }
+        return PlayStats(sessions: choices.sessions, frames: choices.fpsFrames, drawingSeconds: choices.fpsSeconds)
+    }
+
+    /// "3 h 12 min" and the day the game was last played, nil before the first game.
     public func playTime(of game: InstalledGame) -> (total: String, last: String)? {
         let choices = GameChoices.load(titleID: game.id, documents: documents)
         guard let last = choices.lastPlayed else { return nil }
-        let locale = Locale(identifier: language)
+        let locale = Locale(identifier: "en")
         let total: String
         if choices.playSeconds < 60 {
             total = text(.underAMinute)

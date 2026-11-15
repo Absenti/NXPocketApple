@@ -75,7 +75,11 @@ final class PhoneAppSeedTests: XCTestCase {
         try makeIPA(at: bundled, bundleID: PhoneAppDownload.bundleID, version: "0.3.0")
         try makeIPA(at: destination, bundleID: PhoneAppDownload.bundleID, version: "0.2.0")
         XCTAssertEqual(PhoneAppDownload.seed(from: bundled, to: destination)?.version, "0.3.0")
-        XCTAssertNil(PhoneAppDownload.seed(from: bundled, to: destination), "the same version is left alone")
+        XCTAssertNil(PhoneAppDownload.seed(from: bundled, to: destination), "the same build is left alone")
+        // The same version built again, later: the launcher's copy is the newer one and replaces it.
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-3600)], ofItemAtPath: destination.path)
+        XCTAssertNotNil(PhoneAppDownload.seed(from: bundled, to: destination), "a newer build of the same version replaces an older one")
+        XCTAssertNil(PhoneAppDownload.seed(from: bundled, to: destination))
         try makeIPA(at: bundled, bundleID: PhoneAppDownload.bundleID, version: "0.2.5")
         XCTAssertNil(PhoneAppDownload.seed(from: bundled, to: destination), "a newer copy already there is kept")
     }

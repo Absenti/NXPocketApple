@@ -33,6 +33,28 @@ extension AppModel {
     }
 
     /// What the step's button does: open the App Store or Xcode for what only the user can do, or the step itself.
+    /// The engines on this Mac a build can use, the stable one first.
+    public func availableEngines() -> [EngineChoice] {
+        let named = settings.value.engineRoot.isEmpty ? nil : URL(fileURLWithPath: (settings.value.engineRoot as NSString).expandingTildeInPath)
+        return EngineChoices.available(selected: named)
+    }
+
+    /// The engine builds are made with now, wherever it was chosen: Settings, or the first one found.
+    public var engineInUse: URL { toolchain.engine.root }
+
+    /// Builds with this engine from now on; nil goes back to the automatic choice (the first one found).
+    public func useEngine(_ choice: EngineChoice?) {
+        settings.value.engineRoot = choice?.url.path ?? ""
+        append("engine: \(choice.map { "\($0.title) at \($0.url.path)" } ?? "automatic choice")")
+        refreshToolchain()
+    }
+
+    /// Fetches the stable release into the launcher's own folder (the Setup screen shows how it goes). A copy already there is left as it is.
+    public func installStableEngine() {
+        screen = .setup
+        runSetupStep(.engine)
+    }
+
     public func runSetupStep(_ step: SetupStep) {
         switch step {
         case .xcode, .iosSDK:

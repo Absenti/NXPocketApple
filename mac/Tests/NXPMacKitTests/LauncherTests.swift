@@ -252,7 +252,7 @@ final class DeviceInventoryTests: XCTestCase {
         }
     }
 
-    func testSendsTheFrameworkBeforeTheRomfsAndSkipsOnlyTheFindersFiles() throws {
+    func testSendsThePackageFileFirstAndTheRomfsLastAndSkipsOnlyTheFindersFiles() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("nxpocket-top-\(UUID().uuidString)")
         let package = root.appendingPathComponent("0100111000200000.nxgame", isDirectory: true)
         try FileManager.default.createDirectory(at: package.appendingPathComponent("DmGame.framework"), withIntermediateDirectories: true)
@@ -263,7 +263,7 @@ final class DeviceInventoryTests: XCTestCase {
 
         let transfer = DeviceTransfer(toolchain: .empty)
         let entries = try transfer.topLevel(of: package)
-        XCTAssertEqual(entries.map(\.name), ["DmGame.framework", "package.json", "romfs.img"])
+        XCTAssertEqual(entries.map(\.name), ["package.json", "DmGame.framework", "romfs.img"], "the phone can name the game at once")
         XCTAssertEqual(entries.last?.size, 4096)
     }
 }

@@ -297,6 +297,12 @@ extension AppModel {
         }
     }
 
+    /// The App IDs the helper can prepare before the app is on the iPhone: one for each Apple ID Xcode is signed in with.
+    public func plannedMemoryTargets() -> [MemoryLimitHelper.Target] {
+        let base = settings.value.bundleID.isEmpty ? LauncherSettings.defaultBundleID : settings.value.bundleID
+        return MemoryLimitHelper.plannedTargets(base: base, teams: MemoryLimitHelper.xcodeTeams())
+    }
+
     /// Whether Xcode is signed in with the team SideStore uses (Xcode → Settings → Accounts).
     public func xcodeHasTeam(_ team: String) -> Bool { MemoryLimitHelper.xcodeTeams().contains(team) }
 

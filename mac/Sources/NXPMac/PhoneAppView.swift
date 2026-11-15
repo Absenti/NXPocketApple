@@ -14,14 +14,17 @@ struct PhoneAppView: View {
     @EnvironmentObject private var model: AppModel
     @State private var confirmingMemory = false
     @State private var showSource = false
+    /// The team to prepare the App ID for, when Xcode knows several Apple IDs and the app is not on the iPhone yet.
+    @State private var chosenTeam: String?
 
     var body: some View {
         RowsPage {
             PageTitle(title: "iPhone app", subtitle: "Install it once with SideStore or any other signing store. After that, games reach it from this Mac.")
         } content: {
             installGroup
-            stepsGroup
+            // Before the first install: the App ID gets its memory limit now, so the app never needs installing twice.
             memoryGroup
+            stepsGroup
             // Building the IPA needs the project's source folder: only a copy of the repository has it.
             if model.repository != nil { sourceSection }
         }
@@ -61,11 +64,7 @@ struct PhoneAppView: View {
             }
             SettingRow(symbol: "link", title: "SideStore source",
                        detail: "Or add the project's source in SideStore: it installs and updates the app by itself.", detailLines: 2) {
-                Button("Copy link") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(sourceLink, forType: .string)
-                }
-                .buttonStyle(QuietButtonStyle(large: true))
+                Button("Copy link") { copySourceLink() }.buttonStyle(QuietButtonStyle(large: true))
             }
         }
     }
@@ -245,6 +244,11 @@ struct PhoneAppView: View {
                 step(2, "Get the .p12 of the certificate that signed the app: it is the one your store installed it with. In SideStore: Settings → ADVANCED SETTINGS → Certificate Management, touch and hold the active certificate, Export Certificate → Export Full (.p12), set a password, Export, and save the file to Files. With another store (FlareStore, …), use the .p12 and the password it gave you for that certificate.")
                 step(3, "In NXPocketApple: Settings → Certificate → Import a .p12, then type the password. NXPocketApple signs each game on the iPhone with it, so the certificate must belong to the same team as the one that installed the app.")
                 step(4, "A free Apple ID signs apps for 7 days: before they run out, refresh the app in your store (SideStore → My Apps → Refresh All). If NXPocketApple then says its certificate changed, import the new .p12.")
+                step(5, "To get updates in SideStore: Browse → Sources → +, then paste this source link. SideStore then lists each new NXPocketApple and updates it in place, keeping its games and saves.") {
+                    Button("Copy link") { copySourceLink() }.buttonStyle(QuietButtonStyle(large: true))
+                    Text(sourceLink).font(.system(size: 11, design: .monospaced)).foregroundStyle(Ink.secondary)
+                        .textSelection(.enabled).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                }
             }
             warning("Update NXPocketApple through the store that installed it, never by opening an IPA in the Files app: that installs a second copy that cannot run games. Keep the same app ID, and never delete NXPocketApple first: its games and saves go with it.")
         }
@@ -259,12 +263,21 @@ struct PhoneAppView: View {
         .background(Ink.bad.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private func step(_ number: Int, _ text: String) -> some View {
+    private func copySourceLink() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(sourceLink, forType: .string)
+    }
+
+    /// A step, with what goes under its text (a button, a link to copy).
+    private func step<Extra: View>(_ number: Int, _ text: String, @ViewBuilder extra: () -> Extra = { EmptyView() }) -> some View {
         HStack(alignment: .top, spacing: 14) {
             Text("\(number)").font(.system(size: 13, weight: .heavy)).foregroundStyle(Ink.accent)
                 .frame(width: 28, height: 28).background(Ink.raised, in: Circle())
-            Text(text).font(.system(size: 13.5)).foregroundStyle(Ink.primary).fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 4)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(text).font(.system(size: 13.5)).foregroundStyle(Ink.primary).fixedSize(horizontal: false, vertical: true)
+                extra()
+            }
+            .padding(.top, 4)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -292,7 +305,8 @@ struct PhoneAppView: View {
                 iOS gives more memory to an app whose App ID has "Increased Memory Limit". With SideStore or AltStore the App ID is \
                 yours: a free Apple ID cannot turn the capability on in a web page, but Xcode does it when it signs an app with \
                 that entitlement. This builds a one-off helper app with NXPocketApple's App ID, signed by Xcode with your team: \
-                nothing is installed, and only the App ID changes at Apple. Any other store signs with its own App ID, which \
+                nothing is installed, and only the App ID changes at Apple. It works before the first install too: the App ID is the \
+                bundle ID plus your team, which SideStore then finds instead of making a new one. Any other store signs with its own App ID, which \
                 this Mac cannot change: NXPocketApple → Settings → Memory on the iPhone says whether the limit is active.
                 """)
         }
@@ -303,15 +317,31 @@ struct PhoneAppView: View {
             }
         } message: {
             if let target = teamTarget {
-                Text("Xcode signs a helper app as \(target.bundleID) with team \(target.team) and is allowed to update its provisioning at Apple (-allowProvisioningUpdates). That adds the capability to the App ID SideStore registered for NXPocketApple. If Xcode has no development certificate for this Apple ID on this Mac yet, it makes one. Nothing is installed on the iPhone.")
+                Text("Xcode signs a helper app as \(target.bundleID) with team \(target.team) and is allowed to update its provisioning at Apple (-allowProvisioningUpdates). That adds the capability to the App ID SideStore registers (or already registered) for NXPocketApple. If Xcode has no development certificate for this Apple ID on this Mac yet, it makes one. Nothing is installed on the iPhone.")
             }
         }
     }
 
-    /// The team-signed App ID the helper can change, when the app was installed by SideStore or AltStore.
+    /// The App ID the helper can change. On the iPhone: the one SideStore or AltStore registered. Before the app is installed
+    /// (or with no iPhone connected): the one they will register, from the Apple ID Xcode is signed in with.
     private var teamTarget: MemoryLimitHelper.Target? {
-        if case .success(.teamSigned(let target)) = model.installation { return target }
-        return nil
+        switch model.installation {
+        case .success(.teamSigned(let target)): return target
+        case .success(.other): return nil
+        default: return plannedTarget
+        }
+    }
+
+    private var plannedTargets: [MemoryLimitHelper.Target] { model.plannedMemoryTargets() }
+
+    private var plannedTarget: MemoryLimitHelper.Target? {
+        plannedTargets.first { $0.team == chosenTeam } ?? plannedTargets.first
+    }
+
+    /// The app is not on the iPhone: no installation was read (nothing connected, or it is not there yet).
+    private var notInstalledYet: Bool {
+        if case .success = model.installation { return false }
+        return model.installation != nil
     }
 
     private var memoryDetail: String {
@@ -328,10 +358,21 @@ struct PhoneAppView: View {
         switch model.installation {
         case .none:
             SettingRow(symbol: "iphone", title: "Looking for the app…", detail: "On the iPhone.") { ProgressView().controlSize(.small) }
+            if plannedTarget != nil { teamChoice }
         case .failure(let error):
-            SettingRow(symbol: "exclamationmark.triangle", tint: Ink.bad, title: "App not found on the iPhone", detail: error.detail,
-                       detailColor: Ink.bad, detailLines: 3) {
-                Button("Try again") { model.findInstallation() }.buttonStyle(QuietButtonStyle(large: true))
+            if plannedTarget != nil {
+                // Nothing to fix: this is the normal state before the first install.
+                SettingRow(symbol: "iphone", title: "Not installed yet",
+                           detail: "That is fine: turn the limit on now, then install the app. (\(error.detail))", detailLines: 3) {
+                    Button("Look again") { model.findInstallation() }.buttonStyle(QuietButtonStyle(large: true))
+                }
+                teamChoice
+            } else {
+                SettingRow(symbol: "exclamationmark.triangle", tint: Ink.bad, title: "No Apple ID in Xcode",
+                           detail: "To turn the limit on before installing, sign in with the Apple ID your store uses in Xcode → Settings → Accounts. \(error.detail)",
+                           detailColor: Ink.bad, detailLines: 3) {
+                    Button("Look again") { model.findInstallation() }.buttonStyle(QuietButtonStyle(large: true))
+                }
             }
         case .success(.other(let bundleID)):
             SettingRow(symbol: "checkmark.seal", title: "Installed by another store or tool",
@@ -350,6 +391,21 @@ struct PhoneAppView: View {
         }
     }
 
+    /// Which Apple ID's App ID to prepare, when Xcode has more than one.
+    @ViewBuilder
+    private var teamChoice: some View {
+        if plannedTargets.count > 1 {
+            SettingRow(symbol: "person.2", title: "Apple ID", detail: "The one your store (SideStore, AltStore) signs with.", detailLines: 2) {
+                Picker("", selection: Binding(get: { plannedTarget?.team ?? "" }, set: { chosenTeam = $0 })) {
+                    ForEach(plannedTargets, id: \.team) { Text($0.team).tag($0.team) }
+                }
+                .labelsHidden().fixedSize()
+            }
+        } else if let target = plannedTarget {
+            SettingRow(symbol: "person.badge.key", title: "App ID to prepare", detail: target.bundleID, detailLines: 2) { EmptyView() }
+        }
+    }
+
     @ViewBuilder
     private var memoryResult: some View {
         switch model.memoryHelper {
@@ -358,7 +414,9 @@ struct PhoneAppView: View {
         case .finished(let message):
             VStack(spacing: 0) {
                 note(message, Ink.good)
-                step(1, "In SideStore → My Apps, tap Refresh All, or install the IPA again over NXPocketApple: the new signature carries the entitlement.")
+                step(1, notInstalledYet
+                     ? "Now install the IPA with SideStore: its signature carries the entitlement from the first install."
+                     : "In SideStore → My Apps, tap Refresh All, or install the IPA again over NXPocketApple: the new signature carries the entitlement.")
                 step(2, "In NXPocketApple → Settings → Memory, check that it says \"Increased memory limit is active\".")
             }
         case .failed(let message):

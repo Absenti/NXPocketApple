@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 import UniformTypeIdentifiers
 import NXPMacKit
@@ -6,14 +7,19 @@ import NXPocketKit
 
 @MainActor
 public final class AppModel: ObservableObject {
+    public enum ServerStatus: Equatable, Sendable {
+        case unknown, checking, reachable, failed(String)
+    }
+
     public enum Screen: String, CaseIterable, Identifiable {
-        case setup, library, build, devices, phoneApp, settings
+        case setup, library, build, server, devices, phoneApp, settings
         public var id: String { rawValue }
         public var title: String {
             switch self {
             case .setup: return "Setup"
             case .library: return "Library"
             case .build: return "Build"
+            case .server: return "Server"
             case .devices: return "Devices"
             case .phoneApp: return "iPhone app"
             case .settings: return "Settings"
@@ -24,6 +30,7 @@ public final class AppModel: ObservableObject {
             case .setup: return "checklist"
             case .library: return "square.grid.2x2"
             case .build: return "hammer"
+            case .server: return "externaldrive.connected.to.line.below"
             case .devices: return "iphone"
             case .phoneApp: return "arrow.down.app"
             case .settings: return "gearshape"
@@ -126,9 +133,58 @@ public final class AppModel: ObservableObject {
     @Published public internal(set) var cloudCopy: CloudCopyState = .none
     var cloudWatch: Task<Void, Never>?
 
+    // MARK: Sharing (AppModel+Sharing)
+
+    @Published public internal(set) var sharing: SharingState = .off
+    @Published public internal(set) var pairedDevices: [PairedDevice] = []
+    @Published public internal(set) var pairingOffer: PairingSessions.Offer?
+    /// An iPhone asking to pair by comparing a number, waiting for Allow.
+    @Published public internal(set) var pairRequest: PairingSessions.Request?
+    @Published public internal(set) var sharingFingerprint = ""
+    @Published public internal(set) var sharingConnections = 0
+    /// The games iPhones are downloading from this Mac now.
+    @Published public internal(set) var sharingTransfers: [ShareTransfer] = []
+    var transferTick: Task<Void, Never>?
+    var shareServer: ShareServer?
+    var shareTask: Task<Void, Never>?
+    var shareObserver: AnyCancellable?
+    var pairingExpiry: Task<Void, Never>?
+    let busyTitles = BusyTitles()
+    let inboxSettings = InboxSettings()
+    let buildBoard = BuildBoard()
+    /// Built games being put on the player's server: the title ID and how far each is, 0 to 1.
+    @Published public internal(set) var uploads: [String: Double] = [:]
+    /// What the player's server holds, as the Server screen shows it, and how the last look went.
+    @Published public internal(set) var serverGames: [RemoteGame] = []
+    @Published public internal(set) var serverStatus: ServerStatus = .unknown
+    var uploadTasks: [String: Task<Void, Never>] = [:]
+    /// Builds being put in an archive: the title ID and how far each is, 0 to 1.
+    @Published public internal(set) var archiving: [String: Double] = [:]
+    var archiveTasks: [String: Task<Void, Never>] = [:]
+    /// The archive that was just made, for the window to show with its hash.
+    @Published public var archiveResult: ArchiveExport.Result?
+    @Published public internal(set) var exportingWeb = false
+    @Published public var webExportMessage: String?
+    var buildObserver: AnyCancellable?
+    var inboxObserver: AnyCancellable?
+    /// Where the sharing key and the list of paired iPhones live, and whether the server advertises itself on Bonjour: tests
+    /// point the first at a folder of their own and turn the second off.
+    let sharingKeyFolder: URL
+    let advertiseSharing: Bool
+
     // MARK: Queue (AppModel+Queue)
 
-    @Published public internal(set) var queue: [QueueItem] = []
+    @Published public internal(set) var queue: [QueueItem] = [] {
+        // The server marks a game "being rebuilt" while the queue builds or packs it, so a phone does not start on it.
+        didSet {
+            busyTitles.set(Set(queue.compactMap { item -> String? in
+                switch item.phase {
+                case .building, .packing: return item.builds ? item.titleID.uppercased() : nil
+                default: return nil
+                }
+            }))
+        }
+    }
 
     var queueTask: Task<Void, Never>?
     /// Items the user cancelled while they ran: a build cancelled while it packs must not go on to the send.
@@ -146,19 +202,21 @@ public final class AppModel: ObservableObject {
     private var pollTask: Task<Void, Never>?
     private var activeObserver: NSObjectProtocol?
 
-    /// How often the connected iPhones are looked for while the app is in front. The Devices tab used to ask every
-    /// 4 seconds while it was shown, so a phone plugged in, unlocked or trusted appeared without a click; a call
-    /// takes about a second of devicectl, and the app also looks when it comes to the front and before every send.
+    /// How often the connected iPhones are looked for while the app is in front (a call is about a second of devicectl).
+    /// The app also looks when it comes to the front and before every send.
     public static let devicePollInterval: TimeInterval = 25
 
-    public init(settings: SettingsStore? = nil) {
+    public init(settings: SettingsStore? = nil, sharingKeyFolder: URL = ServerIdentity.standardFolder, advertiseSharing: Bool = true) {
         self.settings = settings ?? SettingsStore()
+        self.sharingKeyFolder = sharingKeyFolder
+        self.advertiseSharing = advertiseSharing
         // A build paused when the launcher quits must not stay stopped with nobody to wake it.
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { _ = self?.runner?.resume() }
         }
         refreshToolchain()
         refreshLibrary()
+        observeSharing()
         refreshFolder()
         refreshBackups()
         // The IPA that came inside the app is put in place first, then read: two tasks would race on `phoneIPA`.
@@ -470,6 +528,15 @@ enum Panel {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Choose"
+        panel.message = title
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    static func chooseSaveFile(title: String, name: String, types: [UTType]) -> URL? {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = types
+        panel.nameFieldStringValue = name
+        panel.canCreateDirectories = true
         panel.message = title
         return panel.runModal() == .OK ? panel.url : nil
     }

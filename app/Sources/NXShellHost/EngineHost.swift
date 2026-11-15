@@ -71,6 +71,7 @@ public final class FrameworkEngineHost: EngineHost {
     /// own start is called, so a start refused before that (a missing symbol, a framework of another glue version)
     /// can be followed by another one.
     public func start(_ plan: EngineLaunchPlan) throws -> String? {
+        FrameCounter.install()
         guard !started else { return "A game was already started in this session. Close the app and open it again." }
         guard plan.arguments.count >= 2 else { return "The game's start arguments are incomplete." }
         Self.logTo(plan.logURL)

@@ -42,6 +42,26 @@ public final class ShellHostModel: ObservableObject {
     @Published public private(set) var certificate: StoredCertificate?
     /// Why the certificate the keychain holds could not be read, when it could not: it shows instead of "no certificate".
     @Published public private(set) var certificateProblem: String?
+    /// Where the check of a game's data stands, and what it found (`ShellHostModel+Repair`).
+    @Published public internal(set) var repairState: RepairState = .idle
+    var repairScan: GameRepair.Scan?
+    /// The games taken off this iPhone whose tiles stay.
+    @Published public private(set) var offloaded: [OffloadedGame] = []
+    /// The game whose cheats were turned off because its last start did not come back (`applyCheatsSafeMode`).
+    @Published public var cheatsSafeModeFor: String?
+    /// An archive or a folder asked to be imported, until the player has read the warning and said yes: from Files, or sent by AirDrop.
+    @Published public var archiveRequest: ArchiveRequest?
+    /// Saves from another device that a source holds, newer than these: asked before a game starts.
+    @Published public var syncOffer: SyncOffer?
+    var lastAutoBackup = Date.distantPast
+    let offloadStore: OffloadStore
+    /// Whether the app reminds the player, with a notification, that its signature is about to end.
+    @Published public var certificateReminders: Bool = UserDefaults.standard.object(forKey: "certificateReminders") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(certificateReminders, forKey: "certificateReminders")
+            updateExpiryReminders()
+        }
+    }
     @Published public var importState: ImportState = .idle
     @Published public var launch: LaunchState = .idle
     @Published public internal(set) var loadTest: LoadTestState = .idle
@@ -49,18 +69,23 @@ public final class ShellHostModel: ObservableObject {
     /// The names the player gave games, by title ID (`GameChoices.name`).
     @Published public internal(set) var names: [String: String] = [:]
     @Published public private(set) var pendingTransfers: Int = 0
+    /// What waits to be imported, one entry per transfer, each of which the player can delete.
+    @Published public private(set) var pendingList: [PendingImport] = []
     /// The games the Mac is still sending, with how far each got.
     @Published public private(set) var receiving: [IncomingTransfer] = []
     /// Free space for an import, measured off the main thread: `volumeAvailableCapacityForImportantUsage` asks the
     /// system to estimate what it could purge, which can take a long time, and the library header showed it on every
     /// redraw. Nil until the first measurement comes back.
     @Published public private(set) var freeBytes: Int64?
-    @Published public var language: String
     /// The touch controls' options, one set for every game (`Documents/settings/touch.json`).
     @Published public private(set) var touch: TouchControls
 
     public let engineHost: EngineHost
-    /// Whether a newer NXPocketApple exists (`UpdateChannel`, the app's only network call).
+    /// The Mac and FTP sources games can be downloaded from, off until the player turns them on.
+    public let sources: NetworkSources
+    /// A pairing link opened from the Mac's QR code, waiting for the player to confirm it (`PairLinkSheet`).
+    @Published var pairLink: PairLink?
+    /// Whether a newer NXPocketApple exists (`UpdateChannel`: one request to GitHub, no personal data).
     public let updates: UpdateChecker
 
     let importer: ImportService
@@ -85,8 +110,10 @@ public final class ShellHostModel: ObservableObject {
         self.engineHost = engineHost ?? makeDefaultEngineHost()
         self.signer = signer ?? DeviceSigner()
         self.importer = ImportService(documents: documents, signer: self.signer)
+        self.sources = NetworkSources(documents: documents)
+        self.offloadStore = OffloadStore(documents: documents)
+        self.offloaded = offloadStore.records()
         self.log = ImportLog.standard(in: documents)
-        self.language = Locale.preferredLanguages.first ?? "en"
         self.touch = TouchControls.load(documents: documents)
         try? importer.importer.prepareDirectories()
         BackupExclusion.excludeImportantFolders(in: documents)
@@ -94,22 +121,53 @@ public final class ShellHostModel: ObservableObject {
         GameSaves.cleanLeftovers(in: [documents, FileManager.default.temporaryDirectory])
         SigningLeftovers.clean()
         pendingLaunch = NextLaunch.take(documents: documents)?.description
+        interruptedTransfer = ImportGuard.interrupted(in: documents)
+        if let interruptedTransfer { log.append("the app stopped while importing \(interruptedTransfer): it is not imported again by itself") }
         loadCertificate()
+        updateExpiryReminders()
+        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateExpiryReminders() }
+        }
+        sources.onDownloaded = { [weak self] in self?.refresh() }
+        NotificationCenter.default.addObserver(forName: GameLaunchInbox.didRequest, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { if let asked = GameLaunchInbox.take() { self?.request(asked) } }
+        }
+        NotificationCenter.default.addObserver(forName: LinkInbox.didReceive, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { for url in LinkInbox.take() { self?.open(url) } }
+        }
+        NotificationCenter.default.addObserver(forName: UIScene.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            // After the play clock has written the time of the session that just ended.
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.updateQuickActions() } }
+        }
+        sources.log = { [weak self] in self?.log.append($0) }
+        sources.installedGames = { [weak self] in self?.games ?? [] }
+        sources.canInstall = { [weak self] in !(self?.gameIsOnScreen ?? true) }
+        sources.prepareNotifications = { DownloadNotifier.requestPermission() }
+        sources.onQueueStopped = { [weak self] finished, failed, remaining in
+            guard let self else { return }
+            var body = finished.prefix(3).joined(separator: ", ") + (finished.count > 3 ? "…" : "")
+            if remaining > 0 { body += (body.isEmpty ? "" : " · ") + self.text(.notificationResume) }
+            DownloadNotifier.post(title: self.text(finished.isEmpty && failed > 0 ? .notificationFailed : .notificationDownloaded), body: body)
+        }
         refresh()
     }
 
-    public func text(_ key: ShellStrings.Key) -> String { ShellStrings.text(key, language: language) }
+    public func text(_ key: ShellStrings.Key) -> String { ShellStrings.text(key) }
 
     // MARK: - Library
 
     /// Runs at start, whenever the app comes back to the foreground and after every action, so a transfer that will
     /// never finish leaves the phone the next time the user looks at it.
     public func refresh() {
+        for url in LinkInbox.take() { open(url) }
+        if let asked = GameLaunchInbox.take() { request(asked) }
         importer.cleanUnfinishedTransfers()
         checkTransfers()
         failedLaunch = LaunchGuard.failedLaunch(in: documents)
+        applyCheatsSafeMode()
         scanLibrary()
         measureFreeSpace()
+        autoBackupPlayed()
     }
 
     /// The library is read off the main thread: every file of every game is measured, thousands for a real game, and
@@ -126,6 +184,9 @@ public final class ShellHostModel: ObservableObject {
             guard generation == self.scanGeneration else { return }
             for note in found.notes { self.log.append(note) }
             self.games = found.games
+            self.dropRestoredOffloads()
+            GameCatalog.write(found.games.filter { !$0.isBroken }.map { GameCatalogEntry(id: $0.id, name: self.name(of: $0)) }, documents: self.documents)
+            self.updateQuickActions()
             self.names = found.names
             self.libraryLoaded = true
             self.startPendingLaunch()
@@ -233,6 +294,18 @@ public final class ShellHostModel: ObservableObject {
         }
     }
 
+    /// Sets, or clears, the reminders from what the app reads now: the imported certificate's end and the embedded profile's.
+    public func updateExpiryReminders() {
+        guard certificateReminders, let certificate else {
+            ExpiryReminder.schedule([], title: "", body: { _ in "" })
+            return
+        }
+        let end = ExpiryReminder.expiry(certificate: certificate.expires, profile: SigningFacts.current.profileExpires)
+        ExpiryReminder.schedule(ExpiryReminder.moments(expiry: end), title: text(.certReminderTitle)) { kind in
+            self.text(kind == .dayBefore ? .certReminderDay : .certReminderHours)
+        }
+    }
+
     public func importCertificate(p12: Data, passphrase: String) throws {
         let parsed = try CertificateImporter.read(p12: p12, passphrase: passphrase)
         if let team = ProvisioningProfile.teamID(), team != parsed.certificate.teamID {
@@ -249,6 +322,7 @@ public final class ShellHostModel: ObservableObject {
         }
         certificate = parsed.certificate
         certificateProblem = nil
+        updateExpiryReminders()
         SigningPreference.forget()   // a new certificate may be accepted where the old one was refused
         triedTransfers = []   // a transfer refused for the certificate may go in now
         log.append("certificate \(parsed.certificate.subject) imported, expires \(parsed.certificate.expires)")
@@ -258,6 +332,7 @@ public final class ShellHostModel: ObservableObject {
         CertificateVault.remove()
         certificate = nil
         certificateProblem = nil
+        updateExpiryReminders()
         log.append("certificate removed")
     }
 
@@ -267,7 +342,12 @@ public final class ShellHostModel: ObservableObject {
     /// the certificate) stays in `.incoming`: it is not tried again on its own every two seconds, only from a button or
     /// once the certificate changes.
     private var triedTransfers: Set<String> = []
+    /// The transfer the app stopped in the middle of importing (`ImportGuard`): never imported by itself, so a crash cannot repeat
+    /// at every launch.
+    private var interruptedTransfer: String?
     private var transferWatch: Timer?
+    /// For each transfer being received, how many bytes it had and since when: a count that stays put is a transfer that stopped.
+    private var receivingGrowth: [String: (bytes: Int64, since: Date)] = [:]
 
     /// While the app is in front, a transfer that lands is imported as soon as the Mac writes `.complete`, rather than at
     /// the next start of the app. The Mac's send takes minutes, so a look every two seconds costs nothing and is in time.
@@ -281,6 +361,12 @@ public final class ShellHostModel: ObservableObject {
         }
     }
 
+    /// How long a transfer may go without a byte before it is called stopped.
+    nonisolated(unsafe) static var stalledAfter: TimeInterval = 20
+
+    /// How long a game runs before its launch counts as one that did not fail.
+    static let loadedAfter: TimeInterval = 20
+
     var gameIsOnScreen: Bool {
         switch launch {
         case .launching, .running: return true
@@ -291,27 +377,67 @@ public final class ShellHostModel: ObservableObject {
     /// What is on its way and what has arrived; a transfer that arrived and was never tried is imported at once when a
     /// certificate is there to sign it.
     func checkTransfers() {
-        let incoming = IncomingTransfers.receiving(documents: documents)
+        // A transfer the Mac cancelled and marked is removed at once, not at the next start of the app.
+        importer.importer.cleanAbandonedIncoming()
+        var incoming = IncomingTransfers.receiving(documents: documents)
+        let now = Date()
+        var seen: [String: (bytes: Int64, since: Date)] = [:]
+        for index in incoming.indices {
+            let id = incoming[index].id, bytes = incoming[index].received
+            let since = receivingGrowth[id].flatMap { $0.bytes == bytes ? $0.since : nil } ?? now
+            seen[id] = (bytes, since)
+            incoming[index].stalled = now.timeIntervalSince(since) >= Self.stalledAfter
+        }
+        receivingGrowth = seen
         if incoming != receiving { receiving = incoming }
-        let ready = importer.pending().map(\.lastPathComponent)
+        let folders = importer.pending()
+        let ready = folders.map(\.lastPathComponent)
         if ready.count != pendingTransfers { pendingTransfers = ready.count }
-        guard ready.contains(where: { !triedTransfers.contains($0) }), signingIdentity != nil, !importState.isRunning,
+        let list = folders.map { folder -> PendingImport in
+            let package = BoundedRead.dataIfPresent(at: folder.appendingPathComponent(GamePackage.fileName)).flatMap { try? GamePackage.decode($0) }
+            return PendingImport(name: folder.lastPathComponent, title: package?.name, bytes: package?.totalSize ?? 0,
+                                 interrupted: folder.lastPathComponent == interruptedTransfer)
+        }
+        if list != pendingList { pendingList = list }
+        guard ready.contains(where: { !triedTransfers.contains($0) && $0 != interruptedTransfer }), signingIdentity != nil, !importState.isRunning,
               !loadTest.isRunning, !gameIsOnScreen else { return }
         log.append("import of \(ready.count) transfer(s) that arrived while the app was open")
-        importPendingTransfers()
+        importTransfers(automatic: true)
     }
 
-    public func importPendingTransfers() {
+    /// Deletes a transfer that waits to be imported, and what it holds: the player's way out of one that cannot be imported.
+    public func discardTransfer(_ name: String) {
+        guard SafePath.isSafeComponent(name) else { return }
+        try? FileManager.default.removeItem(at: GameLayout.incomingDirectory(in: documents).appendingPathComponent(name, isDirectory: true))
+        if interruptedTransfer == name {
+            interruptedTransfer = nil
+            ImportGuard.end(in: documents)
+        }
+        log.append("deleted the transfer \(name)")
+        refresh()
+    }
+
+    /// Imports what waits, because the player asked: the transfer the app stopped in is tried again too.
+    public func importPendingTransfers() { importTransfers(automatic: false) }
+
+    private func importTransfers(automatic: Bool) {
         guard !importState.isRunning else { return }
+        let skipped = automatic ? interruptedTransfer.map { Set([$0]) } ?? [] : []
+        if !automatic { interruptedTransfer = nil }
         guard let identity = signingIdentity else {
             importState = .failed(NXPocketError(.noCertificate, "import a certificate first").detail)
             return
         }
         importState = .running(stage: text(.importing), fraction: 0, detail: "")
+        let throttle = ImportProgressLog()
+        let log = self.log
         Task { [importer] in
             do {
                 let report = try await Task.detached(priority: .userInitiated) {
-                    try importer.importEach(identity: identity) { [weak self] progress in
+                    try importer.importEach(identity: identity, skipping: skipped) { [weak self] progress in
+                        // A line every few seconds in the import log, with the memory left: if the app is stopped again, the
+                        // last line says where, and whether it ran out of room.
+                        if let line = throttle.line(progress) { log.append(line) }
                         Task { @MainActor in
                             self?.importState = .running(stage: progress.stage.rawValue,
                                                          fraction: progress.fraction, detail: progress.detail)
@@ -369,6 +495,7 @@ public final class ShellHostModel: ObservableObject {
         do {
             try GameRemoval.remove(game, includingSaves: includingSaves)
             if includingSaves {
+                SaveSnapshots.removeAll(titleID: game.id, documents: documents)
                 GameChoices.remove(titleID: game.id, documents: documents)
                 GameLogs.removeAll(titleID: game.id, documents: documents)
             }
@@ -377,6 +504,40 @@ public final class ShellHostModel: ObservableObject {
             log.append("could not remove \(game.titleID): \(error.localizedDescription)")
         }
         refresh()
+    }
+
+    func updateQuickActions() {
+        QuickActions.update(games, name: { name(of: $0) }, documents: documents)
+    }
+
+    // MARK: - Offloaded games
+
+    /// Takes a game off the phone and keeps its tile, its saves, its settings and its logs.
+    public func offload(_ game: InstalledGame) {
+        guard !gameIsOnScreen else { return }
+        let entry = OffloadedGame(titleID: game.id, name: name(of: game), version: game.version, bytes: game.byteCount, date: Date())
+        do {
+            try offloadStore.add(entry, iconFrom: GameArtwork.iconURL(for: game))
+            remove(game, includingSaves: false)
+            offloaded = offloadStore.records()
+            log.append("offloaded \(game.titleID): the tile, the saves and the settings stay")
+        } catch {
+            log.append("could not offload \(game.titleID): \(error.localizedDescription)")
+        }
+    }
+
+    public func forgetOffloaded(_ titleID: String) {
+        offloadStore.remove(titleID: titleID)
+        offloaded = offloadStore.records()
+    }
+
+    /// A game that came back (downloaded, or sent by the Mac) is no longer offloaded.
+    func dropRestoredOffloads() {
+        let here = Set(games.map(\.id))
+        let gone = offloaded.filter { here.contains($0.titleID) }
+        guard !gone.isEmpty else { return }
+        for entry in gone { offloadStore.remove(titleID: entry.titleID) }
+        offloaded = offloadStore.records()
     }
 
     public func saveBytes(_ game: InstalledGame) -> Int64 { GameRemoval.saveBytes(of: game) }
@@ -443,7 +604,7 @@ public final class ShellHostModel: ObservableObject {
 
     // MARK: - Launch
 
-    public func play(_ game: InstalledGame) {
+    func launchGame(_ game: InstalledGame) {
         guard !gameIsOnScreen else { return }
         // The library's copy, not the one a screen held on to: a signature made since must count.
         let game = current(game)
@@ -497,6 +658,17 @@ public final class ShellHostModel: ObservableObject {
         activeTitleID = game.id
         launch = .launching(name(of: game))
         LaunchGuard.clear(in: documents)
+        noteCheatsLaunch(game)
+        // The saves as they are before this session: the game is not running, so the copy cannot be torn.
+        if previous == nil {
+            do {
+                if try SaveSnapshots.take(game, name: name(of: game), device: UIDevice.current.name, documents: documents) != nil {
+                    log.append("snapshot of the saves of \(game.titleID) taken before the session")
+                }
+            } catch {
+                log.append("no snapshot of the saves of \(game.titleID): \(error.localizedDescription)")
+            }
+        }
         do {
             try plan.checkExecutable()
             try LaunchGuard.willLaunch(titleID: game.titleID, in: documents)
@@ -532,9 +704,20 @@ public final class ShellHostModel: ObservableObject {
             // The second choice loaded where the first was refused: every game is signed so from now on.
             log.append("the \(SigningPreference.current.tag) entitlements load on this installation; the \(previous.tag) ones were refused")
         }
-        // The marker stays while the game is on screen, so a game that kills the app shows up as a failed launch at the
-        // next start, with its log. Leaving the game for the home screen is no failure: the marker goes then.
+        // The marker stays while the game loads, so a game that kills the app on the way in shows up as a failed launch at the
+        // next start, with its log. It goes when the game has been running a while (`loadedAfter`), when the player leaves it for the
+        // home screen, and when the process ends by `exit()` (the game's own Quit): only a game that dies on the way in is "a launch
+        // that failed". Keeping it for the whole session reported every quit and every crash of a played game as one.
         launch = .running(name(of: game))
+        LaunchGuard.clearWhenTheProcessExits(in: documents)
+        let loaded = game.id
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.loadedAfter) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.activeTitleID == loaded, case .running = self.launch else { return }
+                LaunchGuard.clear(in: self.documents)
+                self.log.append("\(loaded) has been running for \(Int(Self.loadedAfter)) s: its launch is no longer watched")
+            }
+        }
         watchTransfers(false)
         let clock = PlayClock(titleID: game.id, documents: documents)
         clock.followScene()

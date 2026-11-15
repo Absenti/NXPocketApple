@@ -39,6 +39,8 @@ targets:
       - Sources/NXShellApp
       # The app icon and the library's logo. Only the catalog: make_icon.swift beside it is a tool, not app code.
       - path: Resources/Assets.xcassets
+      # The permission prompt's text, in the two languages the app speaks.
+      - path: Resources/Localization
       # Outfit (titles) and DM Sans (buttons), both SIL OFL 1.1: registered through UIAppFonts below, licences beside them.
       - path: Resources/Fonts
       # The engine's stand-ins for the console's shared fonts (DM_FONT_DIR, EngineLaunchPlan), copied in by
@@ -55,7 +57,7 @@ targets:
         # Placeholders: the "Version" script after the build writes ../VERSION and $BUILD_NUMBER over them.
         CFBundleShortVersionString: '0.0.0'
         CFBundleVersion: '1'
-        CFBundleLocalizations: [en, fr]
+        CFBundleLocalizations: [en]
         UIAppFonts: [Outfit.ttf, DMSans.ttf]
         LSRequiresIPhoneOS: true
         MinimumOSVersion: '26.0'
@@ -66,6 +68,10 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: dev.nxpocketapple.play
             CFBundleURLSchemes: [nxpocket]
+        # Network sources (docs/SHARING.md): the app only connects out, to the player's own Mac or SFTP server, and
+        # only after they turned the feature on. The first connection is what makes iOS ask for the local network.
+        NSLocalNetworkUsageDescription: NXPocketApple looks for your Mac on this network and downloads the games you pick from it or from your own SFTP server. Nothing else is sent.
+        NSBonjourServices: [_nxpocket._tcp]
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         UIApplicationSupportsIndirectInputEvents: true
@@ -85,6 +91,16 @@ targets:
         CADisableMinimumFrameDurationOnPhone: true
         LSSupportsGameMode: true
         LSApplicationCategoryType: public.app-category.games
+        # Archives of a build, offered "Open in…" and by AirDrop: read where they are, never copied first (a build is gigabytes).
+        LSSupportsOpeningDocumentsInPlace: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Game build archive
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.zip-archive
+              - org.gnu.gnu-zip-archive
+              - public.tar-archive
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
     # One version for the whole repository: the root VERSION file (0.2.0), and the build number CI gives in BUILD_NUMBER
