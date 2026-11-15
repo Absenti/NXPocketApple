@@ -94,6 +94,15 @@ final class PhoneAppTests: XCTestCase {
         XCTAssertEqual(MemoryLimitHelper.teams(inProvisioningTeams: [:]), [])
     }
 
+    func testTheAppIDsToPrepareBeforeTheFirstInstallAreTheBundleIDWithEachTeam() {
+        let targets = MemoryLimitHelper.plannedTargets(base: "dev.nxpocketapple.app", teams: ["ZZZZZ99999", "ABCDE12345"])
+        XCTAssertEqual(targets, [MemoryLimitHelper.Target(bundleID: "dev.nxpocketapple.app.ABCDE12345", team: "ABCDE12345"),
+                                 MemoryLimitHelper.Target(bundleID: "dev.nxpocketapple.app.ZZZZZ99999", team: "ZZZZZ99999")])
+        XCTAssertEqual(MemoryLimitHelper.target(installed: targets[0].bundleID, base: "dev.nxpocketapple.app"), targets[0],
+                       "the ID prepared is the one SideStore later installs under")
+        XCTAssertTrue(MemoryLimitHelper.plannedTargets(base: "dev.nxpocketapple.app", teams: []).isEmpty)
+    }
+
     func testTheHelperAsksForTheEntitlementUnderTheAppIDWithAutomaticSigning() throws {
         let target = MemoryLimitHelper.Target(bundleID: "dev.nxpocketapple.app.ABCDE12345", team: "ABCDE12345")
         let yaml = MemoryLimitHelper.projectYAML(target)

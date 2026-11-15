@@ -29,8 +29,15 @@ struct LibraryScreen: View {
 
     /// Takes the player to the settings, where the certificate is imported.
     let openSettings: () -> Void
+    /// Takes the player to the activity, where what is downloading shows.
+    let openActivity: () -> Void
+    @State private var filter: LibraryFilter = .all
+    @StateObject private var selection = CloudSelection()
 
-    init(openSettings: @escaping () -> Void) { self.openSettings = openSettings }
+    init(openSettings: @escaping () -> Void, openActivity: @escaping () -> Void = {}) {
+        self.openSettings = openSettings
+        self.openActivity = openActivity
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -38,7 +45,11 @@ struct LibraryScreen: View {
                 VStack(alignment: .leading, spacing: 18) {
                     header
                     LibraryNotices(openSettings: openSettings, openLog: { sheet = .logs($0) }, compact: style == "covers" && !model.games.isEmpty)
-                    if model.games.isEmpty {
+                    DownloadStrip(sources: model.sources, open: openActivity)
+                    LibraryFilterBar(sources: model.sources, selection: selection, filter: $filter)
+                    if filter == .cloud || filter == .updates {
+                        // Only the cloud tiles, below.
+                    } else if model.games.isEmpty {
                         // Nothing until the first read of the library is back: "no games yet" would be a lie for a moment.
                         if model.libraryLoaded { emptyState }
                     } else if style == "covers" {
@@ -56,6 +67,7 @@ struct LibraryScreen: View {
                             }
                         }
                     }
+                    CloudGamesSection(sources: model.sources, selection: selection, filter: filter)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -64,6 +76,7 @@ struct LibraryScreen: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .gameActions(actions)
+            .task { model.sources.refreshOffered() }
         }
         .preferredColorScheme(.dark)
         .sheet(item: $sheet) { which in
@@ -79,6 +92,13 @@ struct LibraryScreen: View {
             GameDetailView(game: game)
                 .environmentObject(model)
                 .presentationBackground(ShellInk.background)
+        }
+        .alert(model.text(.syncFoundTitle), isPresented: Binding(get: { model.syncOffer != nil }, set: { _ in }), presenting: model.syncOffer) { _ in
+            Button(model.text(.syncUse)) { model.acceptSyncOffer() }
+            Button(model.text(.syncKeep), role: .cancel) { model.declineSyncOffer() }
+        } message: { offer in
+            Text(String(format: model.text(.syncFoundBody), offer.record.name,
+                        offer.copy.date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "en")))))
         }
     }
 
@@ -221,6 +241,7 @@ struct LibraryScreen: View {
                     headerPill(model.text(.sign)) { model.resignAll() }
                 }
             }
+            ImportMenu()
             if !model.games.isEmpty {
                 Button { withAnimation(.easeOut(duration: 0.2)) { style = style == "covers" ? "grid" : "covers" } } label: {
                     Image(systemName: style == "covers" ? "square.grid.2x2.fill" : "rectangle.stack.fill")
@@ -245,7 +266,7 @@ struct LibraryScreen: View {
     private var summary: String {
         let free = "\(model.freeText) \(model.text(.free))"
         guard !model.games.isEmpty else { return free }
-        return "\(ShellStrings.gameCount(model.games.count, language: model.language)) · \(model.totalText) · \(free)"
+        return "\(ShellStrings.gameCount(model.games.count)) · \(model.totalText) · \(free)"
     }
 
     private var emptyState: some View {
@@ -486,9 +507,20 @@ public struct GameDetailView: View {
     /// Play time and saves, side by side.
     private var statTiles: some View {
         let time = model.playTime(of: game)
-        return HStack(spacing: 12) {
-            tile(model.text(.playTime), time?.total ?? model.text(.neverPlayed), caption: time.map { "\(model.text(.lastPlayed)) · \($0.last)" })
-            tile(model.text(.saves), model.sizeText(model.saveBytes(game)), caption: nil)
+        let stats = model.playStats(of: game)
+        return VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                tile(model.text(.playTime), time?.total ?? model.text(.neverPlayed), caption: time.map { "\(model.text(.lastPlayed)) · \($0.last)" })
+                tile(model.text(.saves), model.sizeText(model.saveBytes(game)), caption: nil)
+            }
+            if let report = model.lastSession(of: game) { SessionChart(report: report) }
+            if let stats {
+                HStack(spacing: 12) {
+                    tile(model.text(.averageFPS), stats.averageFPS.map { "\(Int($0.rounded())) fps" } ?? "–",
+                         caption: stats.averageFPS == nil ? model.text(.fpsNotEnough) : nil)
+                    tile(model.text(.sessions), "\(stats.sessions)", caption: nil)
+                }
+            }
         }
     }
 

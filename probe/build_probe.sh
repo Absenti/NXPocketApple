@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the NXPocketApple probe IPA (README.md explains the tests) with plain clang, no Xcode project.
+# Build the NXPocketApple probe IPA (docs/SIGNING.md has the tests and what they found) with plain clang, no Xcode project.
 # Shape taken from nxnative's dm/ios/probe/build_probe.sh (MIT, seedds).
 #   Payload/NXProbe.app/
 #     NXProbe                                  the app: runs the tests at launch, log on screen and in Documents/probe-log.txt
@@ -8,8 +8,10 @@
 #     Frameworks/OpenSSL.framework             zsign's crypto, a dynamic framework, so it travels inside the app
 #     adhoc.xor                                AdhocProbe XOR 0x5A: ad-hoc signed, never re-signed (negative control)
 #     resignA.xor, resignB.xor                 ResignA 48 / ResignB 49, also XOR'ed: the app signs these itself, in Documents
-#   probe-out/PushProbe.framework              push_answer() = 46 + the same code page: sign it with your identity and push it (README)
-# Usage: probe/build_probe.sh [out dir]   (default: <repo>/probe-out)
+#   probe-out/PushProbe.framework              push_answer() = 46 + the same code page: sign it with your identity and push it (see docs/SIGNING.md)
+# Usage: probe/build_probe.sh [out dir]   (default: <repo>/probe-out); needs tools/build_zsign.sh first. SIM=1 builds for the simulator
+# (tools/run_probe_simulator.sh runs it there). On a phone: install the IPA with SideStore (not in LiveContainer), import the .p12, read the
+# last "RESULT:" line on screen or in Files → NXProbe → probe-log.txt.
 set -u
 cd "$(dirname "$0")" || exit 1
 P=$PWD; OUT=${1:-$(cd .. && pwd)/probe-out}

@@ -10,7 +10,7 @@ public struct ShellSettingsView: View {
     @State private var error: String?
     @State private var showingLogs = false
 
-    private enum Page: Hashable { case touch, memory, signing, updates, about }
+    private enum Page: Hashable { case touch, memory, updates, about }
 
     public init() {}
 
@@ -30,15 +30,14 @@ public struct ShellSettingsView: View {
         ZStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(model.text(.settings)).font(ShellFont.display(32))
+                    Text(model.text(.settings)).font(ShellFont.display(28))
                         .foregroundStyle(ShellInk.primary).padding(.top, 8)
                     certificateCard
+                    SourcesCard(sources: model.sources)
                     VStack(spacing: 0) {
                         link(.touch, dot: Color(red: 0.95, green: 0.72, blue: 0.40), model.text(.touchControls), model.text(.arrangeControls))
                         link(.memory, dot: Color(red: 0.50, green: 0.83, blue: 0.60), model.text(.memory),
                              MemoryBudget.hasIncreasedLimit ? model.text(.memoryActive) : model.text(.memoryInactive))
-                        link(.signing, dot: Color(red: 0.95, green: 0.55, blue: 0.52), model.text(.resignAll),
-                             model.pendingTransfers > 0 ? "\(model.pendingTransfers)" : "")
                         Button { showingLogs = true } label: {
                             listRow(dot: Color(red: 0.54, green: 0.66, blue: 0.95), model.text(.logs), "", last: false)
                         }
@@ -111,7 +110,6 @@ public struct ShellSettingsView: View {
                     switch page {
                     case .touch: TouchControlsCard()
                     case .memory: memoryCard
-                    case .signing: transfersCard
                     case .updates: UpdatesCard(updates: model.updates)
                     case .about: aboutCard
                     }
@@ -129,7 +127,6 @@ public struct ShellSettingsView: View {
         switch page {
         case .touch: return model.text(.touchControls)
         case .memory: return model.text(.memory)
-        case .signing: return model.text(.resignAll)
         case .updates: return model.text(.updates)
         case .about: return model.text(.about)
         }
@@ -179,11 +176,17 @@ public struct ShellSettingsView: View {
                 if model.installIsForDistribution {
                     Text(model.text(.distributionInstallWarning)).font(.system(size: 12)).foregroundStyle(ShellInk.bad)
                 }
+                Toggle(model.text(.certReminderToggle), isOn: $model.certificateReminders)
+                    .font(.system(size: 13)).tint(ShellInk.accent).foregroundStyle(Color.white.opacity(0.85))
+                Text(model.text(.certReminderHint)).font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.55))
                 HStack(spacing: 10) {
                     Button(model.text(.certificateReplace)) { importingP12 = true }.buttonStyle(ShellButtonStyle())
                     Button(model.text(.certificateRemove)) { model.removeCertificate() }.buttonStyle(ShellButtonStyle())
                 }
                 .padding(.top, 4)
+                // After a new certificate: the games signed with the old one are signed again with this one.
+                Button(model.text(.resignAll)) { model.resignAll() }.buttonStyle(ShellButtonStyle())
+                    .disabled(model.importState.isRunning)
             } else {
                 if let problem = model.certificateProblem {
                     Text(model.labelled(.certificateUnreadable, problem)).font(.system(size: 14)).foregroundStyle(ShellInk.bad)
@@ -220,23 +223,6 @@ public struct ShellSettingsView: View {
                 row(model.text(.gamesOnDisk), model.totalText)
                 row(model.text(.freeSpace), model.freeText)
                 Text(model.text(.memoryBody)).font(.system(size: 12)).foregroundStyle(ShellInk.secondary)
-            }
-        }
-    }
-
-    private var transfersCard: some View {
-        ShellCard {
-            VStack(alignment: .leading, spacing: 10) {
-                ShellSectionLabel(model.text(.transfers))
-                row(model.text(.waiting), "\(model.pendingTransfers)")
-                HStack(spacing: 10) {
-                    Button(model.text(.resignAll)) { model.resignAll() }
-                        .buttonStyle(ShellButtonStyle())
-                        .disabled(model.signingIdentity == nil)
-                    Button(model.text(.importGame)) { model.importPendingTransfers() }
-                        .buttonStyle(ShellButtonStyle())
-                        .disabled(model.pendingTransfers == 0)
-                }
             }
         }
     }

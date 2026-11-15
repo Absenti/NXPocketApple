@@ -75,7 +75,7 @@ struct GameSettingsCards: View {
             ForEach(sections, id: \.title) { section in
                 ShellCard {
                     VStack(alignment: .leading, spacing: 12) {
-                        ShellSectionLabel(ShellStrings.settingSection(section.title, language: model.language))
+                        ShellSectionLabel(section.title)
                         ForEach(section.rows) { row($0) }
                         if section.title == "Controls" { touchControlsRow }
                     }
@@ -97,8 +97,8 @@ struct GameSettingsCards: View {
 
     @ViewBuilder
     private func row(_ s: LauncherSetting) -> some View {
-        let label = ShellStrings.settingLabel(s.env, english: s.label, language: model.language)
-        let note = ShellStrings.settingNote(s.env, english: s.note, language: model.language)
+        let label = s.label
+        let note = s.note.isEmpty ? nil : s.note
         let value = settings.value(of: s)
         switch s.kind {
         case "toggle":
@@ -188,7 +188,7 @@ struct SettingChoice: View {
                 Spacer(minLength: 8)
                 Picker(title, selection: Binding(get: { value }, set: set)) {
                     ForEach(setting.options ?? [], id: \.self) { option in
-                        Text(ShellStrings.settingOption(setting.env, value: option[0], english: option[1], language: model.language))
+                        Text(option[1])
                             .tag(option[0])
                     }
                 }

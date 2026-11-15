@@ -14,6 +14,11 @@ final class PlayClock {
     let documents: URL
     private(set) var countingSince: Date?
     private var timer: Timer?
+    private var sampler: Timer?
+    private var counted = false
+    private var frames: Int64 = 0
+    private var drawingSeconds = 0
+    private var recorder = SessionRecorder()
     private var observers: [NSObjectProtocol] = []
 
     init(titleID: String, documents: URL) {
@@ -24,6 +29,17 @@ final class PlayClock {
     func resume(now: Date = Date()) {
         guard countingSince == nil else { return }
         countingSince = now
+        if !counted {
+            counted = true
+            var choices = GameChoices.load(titleID: titleID, documents: documents)
+            choices.sessions += 1
+            try? choices.save(titleID: titleID, documents: documents)
+        }
+        _ = FrameCounter.take()   // what was drawn before this moment is not this stretch's
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        sampler = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.sample() }
+        }
         timer = Timer.scheduledTimer(withTimeInterval: Self.checkpointInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.checkpoint() }
         }
@@ -34,6 +50,18 @@ final class PlayClock {
         countingSince = nil
         timer?.invalidate()
         timer = nil
+        sampler?.invalidate()
+        sampler = nil
+    }
+
+    /// One second of the game: the frames it drew, counted only when there were some.
+    func sample() {
+        let drawn = FrameCounter.take()
+        let level = UIDevice.current.batteryLevel
+        recorder.feed(frames: drawn, thermal: ProcessInfo.processInfo.thermalState.rawValue, battery: level >= 0 ? Double(level) : nil)
+        guard drawn > 0 else { return }
+        frames += drawn
+        drawingSeconds += 1
     }
 
     /// Adds the time since the last checkpoint to the file, and the game's last-played date.
@@ -44,6 +72,11 @@ final class PlayClock {
         var choices = GameChoices.load(titleID: titleID, documents: documents)
         choices.playSeconds += Int(seconds.rounded())
         choices.lastPlayed = now
+        choices.fpsFrames += frames
+        choices.fpsSeconds += drawingSeconds
+        recorder.report.save(titleID: titleID, documents: documents)
+        frames = 0
+        drawingSeconds = 0
         try? choices.save(titleID: titleID, documents: documents)
     }
 

@@ -37,8 +37,7 @@ public enum MemoryBudget {
 
     /// Whether this app gets the increased limit. The system enforces what the app's own signature carries, not what
     /// its profile allows: a store that trims the entitlements it signs with leaves a profile that grants a limit the
-    /// app never receives, and the screen used to say "active" from the profile alone. The profile answers only when
-    /// the signature cannot be read.
+    /// app never receives. The profile answers only when the signature cannot be read.
     public static var hasIncreasedLimit: Bool {
         hasIncreasedLimit(signed: AppSignature.entitlements, profile: ProvisioningProfile.entitlements())
     }
@@ -157,6 +156,20 @@ public enum LaunchGuard {
 
     public static func clear(in documents: URL) {
         LaunchMarker.clear(in: documents)
+    }
+
+    /// The marker's path for the exit handler, which cannot capture anything.
+    nonisolated(unsafe) private static var exitPath: UnsafeMutablePointer<CChar>?
+
+    /// Clears the marker when the process ends by `exit()`. The game's own "Quit" ends the app that way from inside the engine, never
+    /// through `ShellHostModel.quit`, and the marker it left behind showed as "the last launch failed" at every start. A crash, a kill or
+    /// the system's memory cull do not run exit handlers, so they still leave the marker: that is the failure it is there to show.
+    public static func clearWhenTheProcessExits(in documents: URL) {
+        let first = exitPath == nil
+        free(exitPath)
+        exitPath = strdup(LaunchMarker.url(in: documents).path)
+        guard first else { return }
+        atexit { if let path = LaunchGuard.exitPath { unlink(path) } }
     }
 }
 

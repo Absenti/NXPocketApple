@@ -32,6 +32,9 @@ public struct GamePackage: Codable, Equatable, Sendable {
     public var aocSize: Int64
     public var files: [FileEntry]
     public var createdBy: String
+    /// Present when the package carries `romfs.blocks`: what lets an update fetch only what changed. Optional, so a package
+    /// without it (an earlier build) is read as before.
+    public var romfsBlocks: RomfsBlocks?
 
     enum CodingKeys: String, CodingKey {
         case schema, name, version, framework, chain, files
@@ -42,12 +45,14 @@ public struct GamePackage: Codable, Equatable, Sendable {
         case romfsSize = "romfs_size"
         case aocSize = "aoc_size"
         case createdBy = "created_by"
+        case romfsBlocks = "romfs_blocks"
     }
 
     public init(titleID: TitleID, name: String, version: String, packageVersion: String,
                 framework: String, chain: String, minOS: String, romfsID: String,
                 romfsSize: Int64, aocSize: Int64, files: [FileEntry],
-                createdBy: String, schema: Int = currentSchema) {
+                createdBy: String, romfsBlocks: RomfsBlocks? = nil, schema: Int = currentSchema) {
+        self.romfsBlocks = romfsBlocks
         self.schema = schema
         self.titleID = titleID.description
         self.name = name

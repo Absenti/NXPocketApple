@@ -73,11 +73,29 @@ public final class GameImporter {
         }
     }
 
+    /// Only the transfers their sender marked abandoned (a cancel on the Mac), cheap enough to run every few seconds while the app is
+    /// open: nothing is walked, a marker is looked for.
+    @discardableResult
+    public func cleanAbandonedIncoming() -> [URL] {
+        var removed: [URL] = []
+        for name in ((try? fileManager.contentsOfDirectory(atPath: incomingRoot.path)) ?? []).sorted() {
+            let url = incomingRoot.appendingPathComponent(name, isDirectory: true)
+            guard !fileManager.fileExists(atPath: url.appendingPathComponent(GameLayout.completeMarker).path),
+                  fileManager.fileExists(atPath: url.appendingPathComponent(GameLayout.abandonedMarker).path),
+                  (try? fileManager.removeItem(at: url)) != nil else { continue }
+            removed.append(url)
+            log?.append("removed the transfer \(name): the sender cancelled it")
+        }
+        return removed
+    }
+
     /// Removes the transfers that will never finish: one its sender marked abandoned, at once, and one in which nothing
     /// has changed for `idleLimit`, whose sender went away (a cable pulled, the Mac app quit). A transfer that carries
-    /// `.complete` is kept, however old: it waits for the user to import it.
+    /// `.complete` is kept, however old: it waits for the user to import it. A transfer with a download journal is the
+    /// phone's own, paused by the player: it is kept for `pausedLimit`, not for ten minutes.
     @discardableResult
-    public func cleanStaleIncoming(now: Date = Date(), idleLimit: TimeInterval = GameLayout.incomingIdleLimit) -> [URL] {
+    public func cleanStaleIncoming(now: Date = Date(), idleLimit: TimeInterval = GameLayout.incomingIdleLimit,
+                                   pausedLimit: TimeInterval = GameLayout.pausedDownloadIdleLimit) -> [URL] {
         let names = ((try? fileManager.contentsOfDirectory(atPath: incomingRoot.path)) ?? []).sorted()
         var removed: [URL] = []
         for name in names {
@@ -88,7 +106,8 @@ public final class GameImporter {
                 reason = "the sender could not finish it"
             } else {
                 let idle = now.timeIntervalSince(lastActivity(in: url))
-                guard idle > idleLimit else { continue }
+                let paused = fileManager.fileExists(atPath: url.appendingPathComponent(GameLayout.downloadJournal).path)
+                guard idle > (paused ? max(idleLimit, pausedLimit) : idleLimit) else { continue }
                 reason = "nothing arrived for \(Int(idle / 60)) min"
             }
             guard (try? fileManager.removeItem(at: url)) != nil else { continue }
@@ -129,6 +148,9 @@ public final class GameImporter {
                         options: ImportOptions = .default, availableCapacity: Int64? = nil,
                         progress: @escaping (ImportProgress) -> Void = { _ in }) throws -> InstalledGame {
         progress(ImportProgress(stage: .verifying, fraction: 0, detail: "checking the package"))
+        // The downloader's journal is the phone's own bookkeeping and only outlives a download that ended between the
+        // marker and the journal's removal; it does not go into the library.
+        try? fileManager.removeItem(at: folder.appendingPathComponent(GameLayout.downloadJournal))
         let finderFiles = PackageScanner.removeFinderMetadata(in: folder, fileManager: fileManager)
         if !finderFiles.isEmpty {
             log?.append("removed the Finder's files from \(folder.lastPathComponent): \(finderFiles.joined(separator: ", "))")

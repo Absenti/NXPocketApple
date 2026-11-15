@@ -156,9 +156,9 @@ extension ShellHostModel {
         }
     }
 
-    /// "Original name: X", with the space French puts before a colon.
+    /// "Original name: X".
     public func labelled(_ key: ShellStrings.Key, _ value: String) -> String {
-        language.hasPrefix("fr") ? "\(text(key)) : \(value)" : "\(text(key)): \(value)"
+        "\(text(key)): \(value)"
     }
 
     public func sizeText(_ bytes: Int64) -> String { ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) }

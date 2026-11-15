@@ -15,7 +15,7 @@ struct UpdatesCard: View {
                 row(model.text(.installedVersion), updates.installed)
                 row(model.text(.appIdentifierLabel), Bundle.main.bundleIdentifier ?? "unknown")
                 status
-                Button(model.text(.addToSideStore)) { open(UpdateChannel.addSourceURL) }
+                Button(model.text(.addToSideStore)) { addSource() }
                     .buttonStyle(ShellButtonStyle(prominent: true))
                 if sideStoreMissing {
                     Text(model.text(.sideStoreDidNotOpen)).font(.system(size: 12)).foregroundStyle(ShellInk.secondary)
@@ -61,16 +61,24 @@ struct UpdatesCard: View {
 
     private func text(for outcome: UpdateChannel.Outcome) -> String {
         switch outcome {
-        case .newer(let release): return ShellStrings.updateAvailable(release.version, language: model.language)
-        case .upToDate(let release): return ShellStrings.upToDate(release.version, language: model.language)
+        case .newer(let release): return ShellStrings.updateAvailable(release.version)
+        case .upToDate(let release): return ShellStrings.upToDate(release.version)
         case .noPublicChannel: return model.text(.noPublicChannel)
         case .failed(let why): return model.labelled(.checkFailed, why)
         }
     }
 
-    /// SideStore, or the address to add by hand when it does not open (not installed, or under another name).
+    /// SideStore does not always act on the link it is opened with (it only comes to the front), so the address is copied first and
+    /// shown: the one step left is a paste in its Sources screen.
+    private func addSource() {
+        UIPasteboard.general.string = UpdateChannel.sourceURL.absoluteString
+        sideStoreMissing = true
+        open(UpdateChannel.addSourceURL)
+    }
+
+    /// SideStore, or nothing when it is not installed or has another name (the address is on screen either way).
     private func open(_ url: URL) {
-        Task { sideStoreMissing = !(await UIApplication.shared.open(url)) }
+        Task { _ = await UIApplication.shared.open(url) }
     }
 
     private func row(_ label: String, _ value: String) -> some View {
@@ -92,7 +100,7 @@ struct UpdateNotice: View {
     var body: some View {
         if let release = updates.newerRelease {
             NoticeCard(symbol: "arrow.down.app.fill", tint: ShellInk.good,
-                       title: ShellStrings.updateAvailable(release.version, language: model.language),
+                       title: ShellStrings.updateAvailable(release.version),
                        detail: model.text(.updateThroughSideStore)) {
                 Button(model.text(.openSideStore)) {
                     Task { await UIApplication.shared.open(UpdateChannel.openSideStoreURL) }

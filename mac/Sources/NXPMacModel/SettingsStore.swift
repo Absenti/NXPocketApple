@@ -1,4 +1,6 @@
 import Foundation
+import NXPocketSFTP
+import NXPMacKit
 import SwiftUI
 
 /// Everything the launcher remembers between launches.
@@ -9,13 +11,15 @@ public struct LauncherSettings: Codable, Equatable, Sendable {
     public var gameFolder: String = ""
     public var bundleID: String = "dev.nxpocketapple.app"
     public var language: String = ""
-    /// Kept for the saved settings of earlier versions. It does nothing since the launcher builds only a game's framework
-    /// (`--shell-framework`), which makes the engine keep the extraction whatever this says: the launcher needs the RomFS
-    /// image there to pack it. `removeDecompressed` is the setting that frees space.
+    /// Does nothing: the engine keeps the extraction whatever this says (`--shell-framework`), since the launcher needs the RomFS
+    /// image there to pack it. Kept so saved settings still decode.
     public var keepExtracted: Bool = true
     /// Whether the `.nsp` / `.xci` the engine decompresses a `.nsz` / `.xcz` into (`<title ID>_build/nsp/`, as large as the
     /// game) is removed once the build is packed. The dump itself and the build are never touched (`DecompressedCopies`).
     public var removeDecompressed: Bool = true
+    /// Whether the whole work folder (`<title ID>_build`) is removed once a build is packed: the package holds everything the iPhone
+    /// needs, and the folder is gigabytes of extraction and intermediate files. A failed or cancelled build keeps (or cleans) its own.
+    public var removeBuildFolder: Bool = true
     public var allowOtherMetal: Bool = false
     public var deleteSource: Bool = false
     public var xcodePath: String = ""
@@ -39,12 +43,33 @@ public struct LauncherSettings: Codable, Equatable, Sendable {
     /// Each renamed game's own name, from its first package, so a rename can be undone.
     public var originalGameNames: [String: String] = [:]
 
+    /// Whether paired iPhones may list and download the built games from this Mac (`ShareServer`). Off until the player says
+    /// so: nothing listens on the network before that.
+    public var shareEnabled: Bool = false
+    /// The folder shared. Blank shares the folder the games are built into.
+    public var shareFolder: String = ""
+    /// The port the server listens on: chosen by the system the first time and kept, so a paired phone finds the same
+    /// address again. 0 is "not chosen yet".
+    public var sharePort: Int = 0
+    /// Whether a paired iPhone may send copies of its saves to this Mac (`SaveInbox`). On with sharing: the iPhone can write
+    /// nothing else, and only into the Saves folder of the Built games folder.
+    public var shareAcceptSaves: Bool = true
+    /// Whether a paired iPhone may queue the build of a game of the dump folder (`BuildPort`). On with sharing, since pairing is what
+    /// authenticates the phone and at most `BuildBoard.phoneLimit` builds run at once; the player can switch it off.
+    public var shareAllowBuilds: Bool = true
+    /// The player's own SFTP server, where built games can be put (`SFTPSource.upload`): where it is, who logs in, the host key the player
+    /// accepted and the folder. What signs in (a password or a key) is in the keychain, not here. Nil until set up.
+    public var server: SFTPConfig?
+    /// The name the player gave it, or its address.
+    public var serverName: String = ""
+
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case engineRoot, keysFile, outputFolder, gameFolder, bundleID, language, keepExtracted, allowOtherMetal
         case deleteSource, xcodePath, deviceUDID, pythonPath, sendAfterBuild, autoBackup, gameNames, originalGameNames
-        case workFolder, checkUpdates, lastUpdateCheck, removeDecompressed
+        case workFolder, checkUpdates, lastUpdateCheck, removeDecompressed, removeBuildFolder, shareEnabled, shareFolder, sharePort, shareAcceptSaves, shareAllowBuilds
+        case server, serverName
     }
 
     /// Every field is optional on the way in: the synthesised decoder requires them all, so adding one would have
@@ -64,6 +89,7 @@ public struct LauncherSettings: Codable, Equatable, Sendable {
         language = try container.decodeIfPresent(String.self, forKey: .language) ?? defaults.language
         keepExtracted = try container.decodeIfPresent(Bool.self, forKey: .keepExtracted) ?? defaults.keepExtracted
         removeDecompressed = try container.decodeIfPresent(Bool.self, forKey: .removeDecompressed) ?? defaults.removeDecompressed
+        removeBuildFolder = try container.decodeIfPresent(Bool.self, forKey: .removeBuildFolder) ?? defaults.removeBuildFolder
         allowOtherMetal = try container.decodeIfPresent(Bool.self, forKey: .allowOtherMetal) ?? defaults.allowOtherMetal
         deleteSource = try container.decodeIfPresent(Bool.self, forKey: .deleteSource) ?? defaults.deleteSource
         xcodePath = try container.decodeIfPresent(String.self, forKey: .xcodePath) ?? defaults.xcodePath
@@ -76,6 +102,13 @@ public struct LauncherSettings: Codable, Equatable, Sendable {
         gameNames = try container.decodeIfPresent([String: String].self, forKey: .gameNames) ?? defaults.gameNames
         workFolder = try container.decodeIfPresent(String.self, forKey: .workFolder) ?? defaults.workFolder
         originalGameNames = try container.decodeIfPresent([String: String].self, forKey: .originalGameNames) ?? defaults.originalGameNames
+        shareEnabled = try container.decodeIfPresent(Bool.self, forKey: .shareEnabled) ?? defaults.shareEnabled
+        shareFolder = try container.decodeIfPresent(String.self, forKey: .shareFolder) ?? defaults.shareFolder
+        sharePort = try container.decodeIfPresent(Int.self, forKey: .sharePort) ?? defaults.sharePort
+        shareAcceptSaves = try container.decodeIfPresent(Bool.self, forKey: .shareAcceptSaves) ?? defaults.shareAcceptSaves
+        shareAllowBuilds = try container.decodeIfPresent(Bool.self, forKey: .shareAllowBuilds) ?? defaults.shareAllowBuilds
+        server = try container.decodeIfPresent(SFTPConfig.self, forKey: .server)
+        serverName = try container.decodeIfPresent(String.self, forKey: .serverName) ?? defaults.serverName
     }
 
     public var pythonURL: URL? {
@@ -92,6 +125,10 @@ public struct LauncherSettings: Codable, Equatable, Sendable {
 
     public var outputURL: URL {
         outputFolder.isEmpty ? Self.defaultOutputFolder : URL(fileURLWithPath: (outputFolder as NSString).expandingTildeInPath)
+    }
+
+    public var shareURL: URL {
+        shareFolder.isEmpty ? outputURL : URL(fileURLWithPath: (shareFolder as NSString).expandingTildeInPath, isDirectory: true)
     }
 
     public var keysURL: URL? {

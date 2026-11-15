@@ -14,6 +14,7 @@ struct RootView: View {
                 case .setup: SetupView()
                 case .library: LibraryView()
                 case .build: BuildView()
+                case .server: ServerView()
                 case .devices: DevicesView()
                 case .phoneApp: PhoneAppView()
                 case .settings: SettingsView()
@@ -28,7 +29,7 @@ struct RootView: View {
 
     /// The screens in three groups: the games, the iPhone, this Mac.
     private var groups: [(title: String, screens: [AppModel.Screen])] {
-        [("Games", [.library, .build]), ("iPhone", [.devices, .phoneApp]), ("This Mac", [.setup, .settings])]
+        [("Games", [.library, .build, .server]), ("iPhone", [.devices, .phoneApp]), ("This Mac", [.setup, .settings])]
     }
 
     private var sidebar: some View {
@@ -53,6 +54,9 @@ struct RootView: View {
 
             Spacer()
 
+            if !model.sharingTransfers.isEmpty {
+                downloadsCard.padding(.horizontal, 12).padding(.top, 12)
+            }
             if model.queueHasWork {
                 queueCard.padding(12)
             }
@@ -94,6 +98,28 @@ struct RootView: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 10)
+    }
+
+    /// The iPhones downloading from this Mac: one line and one bar each, on every screen.
+    private var downloadsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("iPhone downloads").font(.system(size: 12, weight: .bold))
+            ForEach(model.sharingTransfers) { transfer in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(transfer.name).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                        Spacer()
+                        Text("\(Int(transfer.fraction * 100))%").font(.system(size: 11)).foregroundStyle(Ink.secondary)
+                    }
+                    Bar(fraction: transfer.fraction, tint: Ink.good)
+                    Text("to \(transfer.device) · \(ByteCountFormatter.string(fromByteCount: transfer.sent, countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: transfer.total, countStyle: .file))")
+                        .font(.system(size: 10.5)).foregroundStyle(Ink.secondary).lineLimit(1)
+                }
+            }
+        }
+        .padding(12)
+        .background(Ink.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Ink.line))
     }
 
     /// The running queue: a stitched card that opens the Build screen, where the queue lives.

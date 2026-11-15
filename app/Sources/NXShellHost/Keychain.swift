@@ -7,16 +7,17 @@ import Security
 public enum Keychain {
     public enum Service: String {
         case certificate = "dev.nxpocketapple.certificate"
+        /// What a network source needs to be let in: the token a Mac issued, an FTP server's password. One item per source.
+        case sources = "dev.nxpocketapple.sources"
     }
 
     /// The .p12 and its password together, in one item: one write replaces both or neither.
     public static let identityAccount = "signing.identity"
-    /// Where earlier versions kept them, as two items; read when the combined one is missing, removed once it is written.
+    /// The two items older versions used: read when the combined one is missing, removed once it is written.
     public static let p12Account = "signing.p12"
     public static let passphraseAccount = "signing.passphrase"
 
-    /// Replaces the item in place, or adds it when there is none: a refused write leaves the previous value as it was,
-    /// where deleting first and adding after lost it. A refusal throws `KeychainRefusal` with the system's status.
+    /// Replaces the item in place, or adds it when there is none: a refused write leaves the previous value as it was. A refusal throws `KeychainRefusal` with the system's status.
     public static func store(_ data: Data, account: String, service: Service) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

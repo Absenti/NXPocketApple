@@ -1,11 +1,9 @@
 import Foundation
 import NXPocketKit
 
-/// Turns on "Increased Memory Limit" for the App ID SideStore registered for NXPocketApple, the way it was done by hand on
-/// 2026-11-10 (GetMoreRam did not work for this user): a one-off app whose bundle ID is exactly that App ID, with
-/// the entitlement, built once for a device with Xcode's automatic signing. Xcode then turns the capability on for
-/// the App ID on Apple's side; nothing it builds is installed. SideStore's next install or refresh of NXPocketApple
-/// carries the entitlement, since it signs with what the App ID allows.
+/// Turns on "Increased Memory Limit" for the App ID SideStore registers for NXPocketApple: a one-off app whose bundle ID is
+/// exactly that App ID, with the entitlement, built once with Xcode's automatic signing. Xcode turns the capability on at Apple;
+/// nothing it builds is installed. SideStore's next install or refresh carries the entitlement.
 public enum MemoryLimitHelper {
     public static let entitlement = "com.apple.developer.kernel.increased-memory-limit"
     public static let scheme = "EnableMemoryLimit"
@@ -45,6 +43,12 @@ public enum MemoryLimitHelper {
         let team = String(installed.dropFirst(base.count + 1))
         guard team.count == 10, team.allSatisfy({ $0.isASCII && ($0.isUppercase || $0.isNumber) }) else { return nil }
         return Target(bundleID: installed, team: team)
+    }
+
+    /// The App IDs SideStore will register for the app, before it is installed anywhere: the bundle ID with each team Xcode is signed
+    /// in with. The helper can turn the capability on for one of them first, so the very first install already carries it.
+    public static func plannedTargets(base: String, teams: Set<String>) -> [Target] {
+        teams.sorted().map { Target(bundleID: "\(base).\($0)", team: $0) }
     }
 
     /// The teams Xcode is signed in with (Xcode → Settings → Accounts), from its preferences: the build signs with

@@ -131,6 +131,11 @@ public final class DeviceTransfer: @unchecked Sendable {
             try copy(marker(), to: device, bundleID: bundleID, destination: "\(incoming)/\(GameLayout.completeMarker)",
                      control: control)
         } catch {
+            // A cancel is answered at once: telling the phone to delete the part already sent takes seconds, and nobody waits for it.
+            if let cause = error as? NXPocketError, cause.code == .cancelled {
+                DispatchQueue.global(qos: .utility).async { [self] in _ = abandon(incoming, on: device, bundleID: bundleID) }
+                throw NXPocketError(.cancelled, "send cancelled (the part already sent is being marked for deletion on the iPhone)")
+            }
             // What already reached the phone is gigabytes that will never be imported: it is marked for NXPocketApple
             // there to delete before the failure is reported.
             let marked = abandon(incoming, on: device, bundleID: bundleID)
@@ -166,10 +171,8 @@ public final class DeviceTransfer: @unchecked Sendable {
     /// it holds, as soon as it looks (`GameImporter.cleanStaleIncoming`), and one that never got the marker after
     /// `GameLayout.incomingIdleLimit` without activity.
     ///
-    /// Only the marker is copied. This used to empty the folder first with `devicectl device copy to
-    /// --remove-existing-content true`, which empties the app's WHOLE data container, not the destination: measured
-    /// on the iPhone on 2026-11-11, a file in Documents was gone and Library and SystemData were made anew. Every
-    /// failed or cancelled send wiped the phone's games, saves and settings. False when the phone could not be reached.
+    /// Only the marker is copied, never `--remove-existing-content true`: that empties the app's WHOLE data container, not the
+    /// destination (games, saves and settings went with it). False when the phone could not be reached.
     func abandon(_ incoming: String, on device: Device, bundleID: String) -> Bool {
         let marker = fileManager.temporaryDirectory.appendingPathComponent("nxpocket-abandoned-\(UUID().uuidString)")
         defer { try? fileManager.removeItem(at: marker) }
@@ -226,8 +229,8 @@ public final class DeviceTransfer: @unchecked Sendable {
     }
 
     /// The listing that tells how much of the watched entry arrived, and nothing more: for a file, the transfer
-    /// folder's own entries (`--no-recurse`); for a folder, that folder alone. The whole transfer folder used to be
-    /// listed, recursively, every 3 seconds, a framework's every file included.
+    /// folder's own entries (`--no-recurse`); for a folder, that folder alone (listing the whole
+    /// transfer folder, a framework's every file, was too slow).
     static func watchArguments(_ watch: RemoteWatch, device: Device, bundleID: String, output: URL) -> [String] {
         var arguments = ["devicectl", "device", "info", "files", "--device", device.udid,
                          "--domain-type", "appDataContainer", "--domain-identifier", bundleID,
@@ -298,7 +301,10 @@ public final class DeviceTransfer: @unchecked Sendable {
                 : Int64((try? fileManager.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0)
             entries.append(Entry(name: name, url: url, size: size, isDirectory: isDirectory.boolValue))
         }
-        return entries.sorted { ($0.name == "romfs.img" ? 1 : 0, $0.name) < ($1.name == "romfs.img" ? 1 : 0, $1.name) }
+        // `package.json` first, a few hundred bytes: the phone names the game it is receiving as soon as that lands, not after the framework.
+        // `romfs.img`, nearly the whole package, last.
+        func rank(_ name: String) -> Int { name == GamePackage.fileName ? 0 : (name == "romfs.img" ? 2 : 1) }
+        return entries.sorted { (rank($0.name), $0.name) < (rank($1.name), $1.name) }
     }
 
     /// The bundle ID the app is installed under. SideStore and AltStore append the team to it

@@ -1,7 +1,6 @@
 import Foundation
 
-/// Every string the shell shows, in English and French, keyed by name rather than written inline. English is the
-/// fallback, so a missing translation shows the English line instead of a key.
+/// Every string the shell shows, keyed by name rather than written inline. The app is in English only.
 public enum ShellStrings {
     public enum Key: String, CaseIterable, Sendable {
         case library, libraryEmptyTitle, libraryEmptyBody
@@ -9,13 +8,13 @@ public enum ShellStrings {
         case importGame, importing, imported, importFailed, cancel
         case certificateNone, certificateImport, certificateReplace, certificateRemove
         case certificateBody, certificateTeam, certificateExpires, certificateSubject
-        case certificatePassphrase, certificateWrongPassphrase, certificateWrongTeam
+        case certificatePassphrase, certificateWrongTeam
         case certificateInProfile, certificateNotInProfile, yes, no
-        case memoryActive, memoryInactive, memoryBody, memoryHowTo
+        case memoryActive, memoryInactive, memoryBody
         case resignAll, resigning, resignDone, resignNeeded
-        case play, playing, quit, lastLaunchFailed, tryAgain, broken, remove
+        case play, quit, lastLaunchFailed, broken, remove
         case testLoad, testLoadRunning, testLoadBody, testLoadPassed, testLoadFailed
-        case keepSaves, removeSaves, removeGameBody, storage
+        case removeGameBody, storage
         case log, importLog, copy, done, close
         case gameSettings, handheldMode, handheldModeNote, fpsCounter, settingsAtPlay, noSettings, resetSettings
         case setAtLaunch, setIn
@@ -45,42 +44,63 @@ public enum ShellStrings {
         case details, showGrid, showCovers, transfersEmpty, signIn
         case loadRefusedCertificate, loadRefusedEntitlements, loadRefusedUnknown
         case loadRefusedDistribution, distributionInstallWarning, loadRefusedSandbox
+        case activity, activityInProgress, activityToHandle, filterAll, filterOnPhone, filterCloud, filterUpdates, sourceSectionEmpty
+        case importInterrupted, deleteTransfer
+        case sourcesTab, sourcesOffTitle, sourcesOffBody, sourcesTurnOn
+        case addSource, findMyMac, addMacByAddress, addSFTPServer, sourceKindMac, sourceKindSFTP, forgetSource, sourceNameLabel
+        case searchingMacs, noMacFound, localNetworkDenied, openSettings, macAddressLabel
+        case pairingCodeLabel, pairingCodeHint, pairAction, keyLabel, compareKeyHint, deviceNameLabel
+        case pairingRefused, pairingRateLimited, pairingWrongMac, pairingBadCode
+        case pairByNumber, typeCodeInstead, sameNumberQuestion, numberSame, numberDifferent, waitingForMac, numberHint
+        case pairLinkTitle, pairLinkBody, pairLinkTurnOn, pairingDifferent, pairingBusy
+        case sourceSecretNotSaved, sourceSignedOut, sourceUnreachable, sourceKeyChanged, noGamesOnSource
+        case updateAll, selectAction, doneAction, downloadAll, queuedPosition
+        case autoUpdateTitle, autoUpdateBody, notifyTitle, notifyBody
+        case notificationDownloaded, notificationResume, notificationFailed
+        case cheats, cheatsBody, cheatsImport, cheatsReplace, cheatsRemove, cheatsOn, cheatsSearch, cheatsMasterCode, cheatsNextStart
+        case cheatsNoBuild, cheatsRefused, cheatsSafeMode, cheatsEngineSaid
+        case archiveResumeHint
+        case buildsOnMac, buildFailedOnMac, buildsOffTitle, buildsOffBody, receivingStopped, receivingStoppedBody
+        case addGames, importArchiveItem, importFolderItem, importLinkItem, importSection, sourcesSection
+        case archiveHashPlaceholder, archiveHashHint, archiveHashing
+        case addWebLibrary, sourceKindWeb, webLibraryBody, webTokenLabel, webLibraryCheck, webLibraryFound, sourceSave
+        case archiveLinkTitle, archiveLinkHint, archiveUnpacking, archiveChecking
+        case archiveDownloading, archiveBadLink, archiveWarningTitle, archiveWarning, archiveImportAction
+        case autoBackupTitle, autoBackupBody, syncTitle, syncBody, syncFoundTitle, syncFoundBody, syncUse, syncKeep
+        case timeMachineRemote, timeMachineRemoteLoading, restoreRemoteBody
+        case lastSession, thermalNominal, thermalFair, thermalSerious, thermalCritical, sessionHeat, sessionBattery
+        case repairTitle, repairBody, repairScanning, repairClean, repairFound, repairFrom, repairNoSource, repairDone, repairNoList, repairRepairing
+        case toBuild, buildQueued, buildBuilding, buildAsk, buildAskBody, buildAction, buildsRefused, buildBusy, buildGone
+        case timeMachine, timeMachineBody, timeMachineEmpty, timeMachineRestore, timeMachineRestoreBody, timeMachineDone
+        case averageFPS, sessions, fpsNotEnough
+        case offload, offloadBody, offloadNoSource, offloadedPill, offloadedNoSource, forgetOffloaded
+        case certReminderToggle, certReminderHint, certReminderTitle, certReminderDay, certReminderHours
+        case backUpSaves, backUpAllSaves, backupRunning, backupDone, backupNothing, backupFailed, savesRefused, sourceNoRoom, backupWhere
+        case stateUpToDate, stateRebuilding
+        case downloadSelected, pauseAction, resumeAction, downloadingNow, pausedState
+        case sftpServerLabel, sftpPortLabel, sftpUserLabel, sftpPasswordLabel, sftpAuthLabel, sftpAuthPassword, sftpAuthKey
+        case sftpPrivateKeyLabel, sftpPassphraseLabel, sftpKeyHint, sftpConnect, sftpTrustTitle, sftpTrustBody, sftpTrust
+        case sftpChooseFolder, sftpUseFolder, sftpNoFolders, sftpWrongLogin, sftpBack, sftpFolderUp, sftpBadKey, sftpNoCommonAlgorithms
     }
 
     /// "Version 0.3.0 is available".
-    public static func updateAvailable(_ version: String, language: String = Locale.preferredLanguages.first ?? "en") -> String {
-        language.hasPrefix("fr") ? "La version \(version) est disponible" : "Version \(version) is available"
-    }
+    public static func updateAvailable(_ version: String) -> String { "Version \(version) is available" }
 
     /// "NXPocketApple is up to date (0.2.0)".
-    public static func upToDate(_ version: String, language: String = Locale.preferredLanguages.first ?? "en") -> String {
-        language.hasPrefix("fr") ? "NXPocketApple est à jour (\(version))" : "NXPocketApple is up to date (\(version))"
-    }
+    public static func upToDate(_ version: String) -> String { "NXPocketApple is up to date (\(version))" }
 
     /// The question asked when a game's icon is touched while another game runs: the engine starts once per process,
     /// so the running game has to close. `running` and `next` are the games' names.
-    public static func closeGameQuestion(running: String, next: String,
-                                         language: String = Locale.preferredLanguages.first ?? "en")
-        -> (title: String, message: String, confirm: String) {
-        if language.hasPrefix("fr") {
-            return ("Fermer \(running) ?",
-                    "\(next) s'ouvrira quand tu toucheras de nouveau son icône. Ce que \(running) n'a pas sauvegardé sera perdu.",
-                    "Fermer \(running)")
-        }
-        return ("Close \(running)?",
-                "\(next) opens when you touch its icon again. Whatever \(running) has not saved will be lost.",
-                "Close \(running)")
+    public static func closeGameQuestion(running: String, next: String) -> (title: String, message: String, confirm: String) {
+        ("Close \(running)?",
+         "\(next) opens when you touch its icon again. Whatever \(running) has not saved will be lost.",
+         "Close \(running)")
     }
 
     /// "1 game", "3 games".
-    public static func gameCount(_ count: Int, language: String = Locale.preferredLanguages.first ?? "en") -> String {
-        if language.hasPrefix("fr") { return count > 1 ? "\(count) jeux" : "\(count) jeu" }
-        return count == 1 ? "1 game" : "\(count) games"
-    }
+    public static func gameCount(_ count: Int) -> String { count == 1 ? "1 game" : "\(count) games" }
 
-    public static func text(_ key: Key, language: String = Locale.preferredLanguages.first ?? "en") -> String {
-        (language.hasPrefix("fr") ? french : english)[key] ?? english[key] ?? key.rawValue
-    }
+    public static func text(_ key: Key) -> String { english[key] ?? key.rawValue }
 
     static let english: [Key: String] = [
         .library: "Library",
@@ -110,7 +130,6 @@ public enum ShellStrings {
         .certificateExpires: "Expires",
         .certificateSubject: "Certificate",
         .certificatePassphrase: "Password for the .p12",
-        .certificateWrongPassphrase: "That password does not open this .p12.",
         .certificateWrongTeam: "This certificate belongs to another team. Export the one that installed this app.",
         .certificateInProfile: "In the app's current profile",
         .certificateNotInProfile: "This app is now signed with another certificate than the one imported here. Get the new .p12 (in SideStore, export it) and import it here, or the games may stop loading.",
@@ -119,16 +138,13 @@ public enum ShellStrings {
         .memoryActive: "Increased memory limit is active",
         .memoryInactive: "Standard memory limit",
         .memoryBody: "A game's framework inherits this app's entitlements, so the budget below is what a game gets.",
-        .memoryHowTo: "How to raise it",
         .resignAll: "Sign the games again",
         .resigning: "Signing",
         .resignDone: "Signed",
         .resignNeeded: "Needs signing again",
         .play: "Play",
-        .playing: "Playing",
         .quit: "Quit",
         .lastLaunchFailed: "The last launch failed",
-        .tryAgain: "Sign again and retry",
         .broken: "Broken",
         .remove: "Remove",
         .testLoad: "Test loading",
@@ -136,8 +152,6 @@ public enum ShellStrings {
         .testLoadBody: "Signs the game if needed and loads its code from this phone, without starting it. Once loaded it stays loaded: close the app to test again.",
         .testLoadPassed: "The game loads",
         .testLoadFailed: "The game did not load",
-        .keepSaves: "Keep the saves",
-        .removeSaves: "Remove the saves too",
         .removeGameBody: "Kept saves come back by themselves when the game is sent again.",
         .storage: "Storage",
         .log: "Log",
@@ -276,7 +290,7 @@ public enum ShellStrings {
         .installedVersion: "Installed version",
         .appIdentifierLabel: "App identifier",
         .addToSideStore: "Add NXPocketApple to SideStore",
-        .sideStoreDidNotOpen: "SideStore did not open. Add this source in SideStore, Sources tab:",
+        .sideStoreDidNotOpen: "The address is copied. If SideStore did not add the source by itself: in SideStore, Browse → Sources → +, then paste this address:",
         .copyAddress: "Copy the address",
         .checkUpdates: "Check",
         .checking: "Checking",
@@ -289,216 +303,212 @@ public enum ShellStrings {
         .updateWarning: "Update NXPocketApple through SideStore only, never by touching an IPA in Files. SideStore must keep the app identifier above: under another identifier the app starts from nothing, and the games and saves of the previous install are gone.",
         .updateSavesHint: "The Mac app copies the games' saves every day and before each send. Make a copy from the Mac before an update.",
         .updateThroughSideStore: "Install it from SideStore, which keeps the games and saves.",
-        .networkNotice: "The app's only connection: the update check reads source.json on GitHub, one request, no personal data."
-    ]
-
-    static let french: [Key: String] = [
-        .library: "Bibliothèque",
-        .details: "Détails",
-        .signIn: "Se connecter",
-        .showGrid: "Voir tous les jeux",
-        .showCovers: "Voir les pochettes une à une",
-        .transfersEmpty: "Les jeux arrivent du Mac par USB ou en Wi-Fi et sont importés dès qu'ils sont là.",
-        .libraryEmptyTitle: "Aucun jeu",
-        .libraryEmptyBody: "Construis un jeu sur ton Mac avec NXPocketApple et envoie-le par câble ou en Wi-Fi. Il apparaît ici tout seul, sans réinstaller cette app.",
-        .settings: "Réglages",
-        .certificate: "Certificat",
-        .memory: "Mémoire",
-        .transfers: "Transferts",
-        .about: "À propos",
-        .importGame: "Importer un jeu",
-        .importing: "Import en cours",
-        .imported: "Importé",
-        .importFailed: "Échec de l'import",
-        .cancel: "Annuler",
-        .certificateNone: "Aucun certificat",
-        .certificateImport: "Importer un .p12",
-        .certificateReplace: "Remplacer",
-        .certificateRemove: "Supprimer",
-        .certificateBody: "Importe le .p12 du certificat qui a signé cette app : exporté depuis SideStore, ou celui que ton store t'a donné. Il reste dans le trousseau de cette app, jamais dans un fichier, jamais sur le réseau.",
-        .certificateTeam: "Équipe",
-        .certificateExpires: "Expire",
-        .certificateSubject: "Certificat",
-        .certificatePassphrase: "Mot de passe du .p12",
-        .certificateWrongPassphrase: "Ce mot de passe n'ouvre pas ce .p12.",
-        .certificateWrongTeam: "Ce certificat appartient à une autre équipe. Exporte celui qui a installé cette app.",
-        .certificateInProfile: "Dans le profil actuel de l'app",
-        .certificateNotInProfile: "Cette app est maintenant signée avec un autre certificat que celui importé ici. Prends le nouveau .p12 (dans SideStore, exporte-le) et importe-le ici, sinon les jeux risquent de ne plus se charger.",
-        .yes: "Oui",
-        .no: "Non",
-        .memoryActive: "La limite de mémoire augmentée est active",
-        .memoryInactive: "Limite de mémoire standard",
-        .memoryBody: "Le framework d'un jeu hérite des droits de cette app : le budget ci-dessous est celui d'un jeu.",
-        .memoryHowTo: "Comment l'augmenter",
-        .resignAll: "Re-signer les jeux",
-        .resigning: "Signature",
-        .resignDone: "Signé",
-        .resignNeeded: "À re-signer",
-        .play: "Jouer",
-        .playing: "En cours",
-        .quit: "Quitter",
-        .lastLaunchFailed: "Le dernier lancement a échoué",
-        .tryAgain: "Re-signer et réessayer",
-        .broken: "Cassé",
-        .remove: "Supprimer",
-        .testLoad: "Tester le chargement",
-        .testLoadRunning: "Chargement du code du jeu",
-        .testLoadBody: "Signe le jeu si besoin et charge son code sur ce téléphone, sans le lancer. Une fois chargé, il le reste : ferme l'app pour refaire le test.",
-        .testLoadPassed: "Le jeu se charge",
-        .testLoadFailed: "Le jeu ne s'est pas chargé",
-        .keepSaves: "Garder les sauvegardes",
-        .removeSaves: "Supprimer aussi les sauvegardes",
-        .removeGameBody: "Les sauvegardes gardées reviennent d'elles-mêmes si tu renvoies le jeu.",
-        .storage: "Stockage",
-        .log: "Journal",
-        .importLog: "Journal d'import",
-        .copy: "Copier",
-        .done: "Terminé",
-        .close: "Fermer",
-        .gameSettings: "Réglages du jeu",
-        .handheldMode: "Mode portable",
-        .handheldModeNote: "Désactivé, le jeu tourne comme sur la station d'accueil, branché à une TV.",
-        .fpsCounter: "Compteur d'images par seconde",
-        .settingsAtPlay: "Appliqués au lancement du jeu.",
-        .noSettings: "Ce jeu n'a pas de liste de réglages : il démarre avec les réglages par défaut du moteur.",
-        .resetSettings: "Revenir aux réglages testés",
-        .setAtLaunch: "Fixé au lancement",
-        .setIn: "Fixé dans",
-        .touchControls: "Commandes tactiles",
-        .touchControlsBody: "Un seul jeu de réglages pour tous les jeux, appliqué au prochain lancement d'un jeu.",
-        .touchSize: "Taille",
-        .touchSmall: "Petites",
-        .touchMedium: "Moyennes",
-        .touchLarge: "Grandes",
-        .touchStick: "Stick gauche",
-        .stickCorner: "Dans le coin",
-        .stickHigher: "Plus haut",
-        .stickInward: "Vers le centre",
-        .arrangeControls: "Disposer les commandes",
-        .controlsMoved: "Commandes déplacées",
-        .allGames: "Tous les jeux",
-        .editorHint: "Fais glisser une commande. Elle ne va que là où le jeu peut la dessiner.",
-        .layout2D: "2D",
-        .layout3D: "3D",
-        .keysApart: "A B X Y une par une",
-        .resetLayout: "Réinitialiser cette disposition",
-        .noRoomThere: "Pas de place ici",
-        .keptInPlace: "Gardées à leur place sur ce téléphone :",
-        .movePanel: "Déplacer ce panneau",
-        .turnSideways: "Tourne le téléphone pour placer les commandes à leur taille réelle.",
-        .touchHint: "Stick droit : glisse ici",
-        .save: "Enregistrer",
-        .free: "libres",
-        .receiving: "Réception",
-        .aGame: "un jeu",
-        .sizeOf: "sur",
-        .received: "reçus",
-        .tryAgainImport: "Réessayer",
-        .certificateNeededTitle: "Importe ton certificat",
-        .certificateNeededBody: "Les jeux sont signés sur ce téléphone avec le .p12 du certificat qui a signé cette app.",
-        .gameWaitsForCertificate: "Un jeu est arrivé. Importe le certificat (.p12) de cette app et il s'installe aussitôt.",
-        .toSignAgain: "à re-signer",
-        .signAgainBody: "Le certificat a changé ou va expirer. La signature prend un moment par jeu.",
-        .sign: "Signer",
-        .rename: "Renommer",
-        .renameBody: "Seul le nom affiché dans NXPocketApple change. Les fichiers du jeu restent tels quels et une mise à jour garde ce nom.",
-        .originalName: "Nom d'origine",
-        .resignGame: "Re-signer",
-        .copyIdentifier: "Copier l'identifiant",
-        .gameSize: "Jeu",
-        .freeSpace: "Espace libre",
-        .moreActions: "Plus",
-        .removeKeepSaves: "Supprimer le jeu, garder les sauvegardes",
-        .removeEverything: "Tout effacer",
-        .gameDidNotStart: "Le jeu n'a pas démarré",
-        .starting: "Démarrage",
-        .saves: "Sauvegardes",
-        .exportSaves: "Exporter les sauvegardes",
-        .importSaves: "Importer une sauvegarde",
-        .deleteSaves: "Supprimer les sauvegardes",
-        .deleteSavesBody: "Elles ne pourront pas revenir, sauf si tu en as une copie sur le Mac ou dans Fichiers.",
-        .noSavesYet: "Pas encore de sauvegarde",
-        .savesImported: "Sauvegarde importée",
-        .previousSavesKept: "Les sauvegardes remplacées sont gardées dans Fichiers › Sur mon iPhone › NXPocketApple › Saves.",
-        .savesNotImported: "Sauvegarde non importée",
-        .saveOfOtherGame: "Cette sauvegarde est celle d'un autre jeu :",
-        .notASaveCopy: "Choisis une copie de sauvegarde : un dossier copié par l'app Mac (il contient backup.json) ou un .zip exporté ici.",
-        .saveIncomplete: "Cette copie est incomplète : il manque des fichiers.",
-        .saveCopyEmpty: "Cette copie ne contient aucune sauvegarde.",
-        .saveUnreadable: "La copie n'a pas pu être lue :",
-        .logs: "Journaux",
-        .logsBody: "Le journal de l'app et un journal par lancement de jeu, du plus récent au plus ancien.",
-        .appLog: "Journal de l'app",
-        .noLogs: "Aucun journal pour l'instant. Un jeu en écrit un à chaque lancement.",
-        .share: "Partager",
-        .erase: "Effacer",
-        .eraseLogBody: "Ce journal sera effacé définitivement.",
-        .logShownTail: "Seule la fin est affichée. Partage le journal pour avoir le fichier entier.",
-        .emptyLog: "Ce journal est vide.",
-        .addToHomeScreen: "Ajouter à l'écran d'accueil",
-        .shortcutStep1: "Dans Fichiers, touche le fichier de ce jeu. iOS le reçoit comme un profil à installer.",
-        .shortcutStep2: "Ouvre Réglages › Profil téléchargé › Installer, puis saisis le code de l'iPhone.",
-        .shortcutStep3: "L'icône du jeu apparaît sur l'écran d'accueil. La toucher ouvre le jeu.",
-        .shortcutRemove: "Pour la retirer : Réglages › Général › VPN et gestion de l'appareil.",
-        .shortcutDescription: "Met l'icône de ce jeu sur l'écran d'accueil. La toucher ouvre le jeu dans NXPocketApple.",
-        .openInFiles: "Ouvrir dans Fichiers",
-        .shareFile: "Partager le fichier",
-        .shortcutFailed: "Le raccourci n'a pas pu être créé",
-        .certificateUnreadable: "Le certificat gardé par l'app n'a pas pu être lu :",
-        .certificateNeededToPlay: "Importe d'abord le certificat (.p12) de cette app, dans Réglages.",
-        .loadRefusedCertificate: "iOS a refusé le code de ce jeu : le certificat importé ici n'est pas celui qui a signé cette app. Importe le .p12 du certificat avec lequel ton store a installé NXPocketApple (même équipe, même certificat), puis réessaie.",
-        .loadRefusedEntitlements: "iOS a refusé le code de ce jeu : sa signature revendique des droits que la signature de cette app n'a pas. L'app a été installée par un store qui signe d'une façon que les jeux ne peuvent pas suivre. Copie le rapport ci-dessous et envoie-le.",
-        .loadRefusedUnknown: "iOS a refusé le code de ce jeu, et tout ce que cette app peut vérifier concorde (certificat, équipe, identifiant, droits). Copie le rapport ci-dessous et envoie-le : il dit ce qui a été comparé.",
-        .loadRefusedDistribution: "Le bac à sable d'iOS a refusé que cette app exécute le code du jeu : dyld nomme le bac à sable, pas la signature du code, donc la signature du jeu n'est pas ce qui a refusé. Tout ce que cette app peut comparer concorde (certificat, équipe, identifiant, droits). La seule différence avec l'installation connue pour fonctionner (SideStore) : cette app est signée pour la distribution (profil ad hoc, entreprise ou App Store, sans get-task-allow), et iOS ne laisse très probablement une app exécuter du code hors de son bundle que si elle est signée pour le développement. Installe l'app avec SideStore, ou avec un store qui lui donne un profil de développement.",
-        .loadRefusedSandbox: "Le bac à sable d'iOS a refusé que cette app exécute le code du jeu : dyld nomme le bac à sable, pas la signature du code, donc la façon dont le jeu est signé n'est pas la cause. L'app est signée pour le développement et tout ce qu'elle peut comparer concorde : la cause est dans ce que son propre processus a le droit de faire, qu'elle ne peut pas lire. Copie le rapport ci-dessous et envoie-le.",
-        .distributionInstallWarning: "Cette app est signée pour la distribution, pas pour le développement (pas de get-task-allow). iOS peut refuser d'exécuter des jeux depuis elle. SideStore l'installe de la façon connue pour fonctionner.",
-        .certificateExpiredBody: "Le certificat a expiré. Prends un nouveau .p12 (dans SideStore, exporte-le) et importe-le dans Réglages.",
-        .importRefused: "Refusé",
-        .noManifest: "Ce jeu n'a pas de manifeste pour démarrer. Renvoie-le depuis le Mac.",
-        .busyImporting: "Un import ou une signature est en cours. Relance le jeu quand c'est fini.",
-        .availableNow: "Disponible maintenant",
-        .deviceMemory: "Mémoire de l'appareil",
-        .gamesOnDisk: "Jeux sur le disque",
-        .waiting: "En attente",
-        .daysLeft: "Jours restants",
-        .signingIdentifier: "Identifiant de signature",
-        .appLabel: "App",
-        .signatureLabel: "Signature",
-        .installedBy: "Installée par",
-        .unknownTeam: "équipe inconnue",
-        .engineHost: "Hôte du moteur",
-        .engineInEachGame: "dans le framework de chaque jeu",
-        .noEngineInBuild: "aucun dans cette version",
-        .folderLabel: "Dossier",
-        .folderInFiles: "Fichiers › Sur mon iPhone › NXPocketApple",
-        .noKeysNotice: "NXPocketApple ne fournit aucune clé, aucun firmware et aucun jeu. Les jeux qu'il lance viennent de tes propres copies, construites sur ton Mac.",
-        .p12PasswordHint: "Le mot de passe du .p12 : celui choisi à l'export, ou celui de ton store.",
-        .identifierLabel: "Identifiant",
-        .keychainRefused: "Le trousseau a refusé le certificat",
-        .keychainMissingEntitlement: "Le trousseau a refusé le certificat : la signature que l'installateur a donnée à l'app ne lui ouvre aucun groupe de trousseau",
-        .copyReport: "Copier le rapport",
-        .reportCopied: "Rapport copié",
-        .playTime: "Temps de jeu",
-        .lastPlayed: "Dernière partie",
-        .neverPlayed: "Pas encore joué",
-        .underAMinute: "moins d'une minute",
-        .updates: "Mises à jour",
-        .installedVersion: "Version installée",
-        .appIdentifierLabel: "Identifiant de l'app",
-        .addToSideStore: "Ajouter NXPocketApple à SideStore",
-        .sideStoreDidNotOpen: "SideStore ne s'est pas ouvert. Ajoute cette source dans SideStore, onglet Sources :",
-        .copyAddress: "Copier l'adresse",
-        .checkUpdates: "Vérifier",
-        .checking: "Vérification",
-        .noPublicChannel: "Pas encore de canal public",
-        .checkFailed: "La vérification n'a pas abouti",
-        .openSideStore: "Ouvrir SideStore",
-        .checkDaily: "Vérifier une fois par jour",
-        .lastCheck: "Dernière vérification",
-        .later: "Plus tard",
-        .updateWarning: "Mets NXPocketApple à jour par SideStore seulement, jamais en touchant un IPA dans Fichiers. SideStore doit garder l'identifiant de l'app ci-dessus : sous un autre identifiant, l'app repart de zéro et les jeux et sauvegardes de l'installation précédente ne sont plus là.",
-        .updateSavesHint: "L'app Mac copie les sauvegardes des jeux chaque jour et avant chaque envoi. Fais-en une copie depuis le Mac avant une mise à jour.",
-        .updateThroughSideStore: "Installe-la depuis SideStore, qui garde les jeux et les sauvegardes.",
-        .networkNotice: "Seule connexion de l'app : la vérification des mises à jour lit source.json sur GitHub, en une requête, sans aucune donnée personnelle."
+        .networkNotice: "The update check reads source.json on GitHub: one request, no personal data. Network sources, when you turn them on, connect only to your own Mac or SFTP server.",
+        .activity: "Activity",
+        .activityInProgress: "In progress",
+        .activityToHandle: "To handle",
+        .filterAll: "All",
+        .filterOnPhone: "On iPhone",
+        .filterCloud: "Cloud",
+        .filterUpdates: "Updates",
+        .sourceSectionEmpty: "No source yet",
+        .importInterrupted: "The app stopped while importing this game, so it is not imported again by itself. Try again, or delete it.",
+        .deleteTransfer: "Delete",
+        .sourcesTab: "Sources",
+        .sourcesOffTitle: "Games from your network",
+        .sourcesOffBody: "Looks for your Mac on this network, or an SFTP server you add, and downloads the games you pick. Sends only this iPhone's name and a pairing token or password. Off until you turn it on.",
+        .sourcesTurnOn: "Turn on",
+        .addSource: "Add a source",
+        .findMyMac: "Find my Mac",
+        .addMacByAddress: "Add by address",
+        .sourceKindMac: "Mac",
+        .forgetSource: "Forget this source",
+        .sourceNameLabel: "Name",
+        .searchingMacs: "Looking for Macs on this network…",
+        .noMacFound: "No Mac found. Turn on sharing in the launcher on the Mac (Settings → Sharing), or type its address.",
+        .localNetworkDenied: "iOS blocked the local network for NXPocketApple. Allow it in Settings → Privacy & Security → Local Network, or type the Mac's address.",
+        .openSettings: "Open Settings",
+        .macAddressLabel: "Address, as the launcher shows it",
+        .pairingCodeLabel: "Code",
+        .pairingCodeHint: "Type the code under \"Cannot scan?\" in the launcher (Settings → Sharing → Pair an iPhone). It works once, for two minutes.",
+        .pairAction: "Pair",
+        .keyLabel: "Key",
+        .compareKeyHint: "The launcher shows the same key under its address. If they differ, do not pair.",
+        .deviceNameLabel: "Name of this iPhone",
+        .pairingRefused: "The Mac did not accept this code. It may have run out, been used already, or be mistyped.",
+        .pairingRateLimited: "Too many attempts. Wait a minute and ask the Mac for a new code.",
+        .pairingWrongMac: "The answer did not come from the Mac that showed the code. Nothing was saved.",
+        .pairingBadCode: "A code is six digits.",
+        .pairByNumber: "Compare a number",
+        .typeCodeInstead: "Type a code instead",
+        .sameNumberQuestion: "Same number on the Mac?",
+        .numberSame: "Same",
+        .numberDifferent: "Different",
+        .waitingForMac: "Waiting for you to allow it on the Mac…",
+        .numberHint: "Allow it on the Mac only if it shows this number.",
+        .pairLinkTitle: "Pair with this Mac",
+        .pairLinkBody: "You scanned the code on the Mac's screen. Pairing sends this iPhone's name and nothing else.",
+        .pairLinkTurnOn: "Turn on network sources and pair",
+        .pairingDifferent: "The numbers differ, so nothing was paired. If this happens again, someone else may be on this network.",
+        .pairingBusy: "Another iPhone is pairing with this Mac right now.",
+        .sourceSecretNotSaved: "The keychain refused to keep this source's secret: it is kept until the app quits, and you will have to enter it again.",
+        .sourceSignedOut: "The source no longer recognises this iPhone. Pair or sign in again.",
+        .sourceUnreachable: "The source could not be reached.",
+        .sourceKeyChanged: "The source's key is not the one this iPhone accepted. Nothing was downloaded.",
+        .noGamesOnSource: "No built game here.",
+        .sftpServerLabel: "Server",
+        .sftpPortLabel: "Port",
+        .sftpUserLabel: "User",
+        .sftpPasswordLabel: "Password",
+        .sftpAuthLabel: "Sign in with",
+        .sftpAuthPassword: "A password",
+        .sftpAuthKey: "A private key",
+        .sftpPrivateKeyLabel: "Private key (ed25519, OpenSSH format)",
+        .sftpPassphraseLabel: "Passphrase of the key, if it has one",
+        .sftpKeyHint: "The server's own tools show the same fingerprint (ssh-keygen -lf on the server, or its SSH settings). If they differ, do not trust it.",
+        .sftpConnect: "Connect",
+        .sftpTrustTitle: "Trust this server's key?",
+        .sftpTrustBody: "Nothing has been sent to it yet: no password, no key. From now on this iPhone talks to this server only if it presents this same key.",
+        .sftpTrust: "Trust it",
+        .sftpChooseFolder: "Choose the folder that holds the built games",
+        .sftpUseFolder: "Use folder",
+        .sftpNoFolders: "No folder here.",
+        .sftpWrongLogin: "The server refused this user name, password or key.",
+        .sftpBack: "Back",
+        .sftpFolderUp: "Parent folder",
+        .sftpBadKey: "This key cannot be read. Only ed25519 keys in OpenSSH format are supported.",
+        .sftpNoCommonAlgorithms: "This server offers no cipher or key this app supports (it needs aes-gcm, curve25519 and an ed25519 or ECDSA host key).",
+        .addSFTPServer: "SFTP server",
+        .sourceKindSFTP: "SFTP server",
+        .stateUpToDate: "Up to date",
+        .stateRebuilding: "Being rebuilt",
+        .updateAll: "Update all",
+        .selectAction: "Select",
+        .doneAction: "Done",
+        .downloadAll: "Download all",
+        .queuedPosition: "Waiting",
+        .autoUpdateTitle: "Update games by themselves",
+        .autoUpdateBody: "When a source has a newer build of a game you have, it is downloaded and installed while the app is open.",
+        .notifyTitle: "Tell me when downloads finish",
+        .notifyBody: "A notification when the app is in the background. iOS stops a download a few seconds after you leave the app, so it is also the way to know one is waiting.",
+        .notificationDownloaded: "Download finished",
+        .notificationResume: "Open the app to continue the others.",
+        .notificationFailed: "A download failed",
+        .backUpSaves: "Back up the saves to…",
+        .backUpAllSaves: "Back up all my saves",
+        .backupRunning: "Backing up the saves…",
+        .backupDone: "Saves backed up",
+        .backupNothing: "There are no saves to back up yet.",
+        .backupFailed: "The backup did not work",
+        .savesRefused: "This Mac does not accept saves. Turn on “Accept copies of saves from iPhones” in the launcher's Sharing settings.",
+        .sourceNoRoom: "There is not enough room for the saves there.",
+        .backupWhere: "Where do you want the copy?",
+        .certReminderToggle: "Remind me before it expires",
+        .certReminderHint: "A notification a day and two hours before the certificate or the profile ends. It moves by itself when SideStore renews the app.",
+        .certReminderTitle: "NXPocketApple expires soon",
+        .certReminderDay: "Open SideStore by tomorrow to refresh the app, or your games will stop opening.",
+        .certReminderHours: "Less than two hours left. Refresh the app in SideStore now.",
+        .offload: "Offload the game",
+        .offloadBody: "Frees %@. The saves and settings stay, and the tile stays in the library: a touch downloads the game again.",
+        .offloadNoSource: "No source has this game right now: to get it back you would have to send it from the Mac again.",
+        .offloadedPill: "Offloaded",
+        .offloadedNoSource: "Offloaded · no source has it",
+        .forgetOffloaded: "Forget this tile",
+        .averageFPS: "Average FPS",
+        .sessions: "Sessions",
+        .fpsNotEnough: "Play a little longer",
+        .timeMachine: "Time Machine of the saves",
+        .timeMachineBody: "A copy of the saves is taken before each session, when they changed. Touch one to put those saves back.",
+        .timeMachineEmpty: "No copy yet: the first is taken the next time you start the game.",
+        .timeMachineRestore: "Put these saves back",
+        .timeMachineRestoreBody: "The saves you have now are kept as a copy in Files, under Saves.",
+        .timeMachineDone: "The saves are back. The ones you had are kept in Files, under Saves.",
+        .toBuild: "To build on the Mac",
+        .buildQueued: "Waiting on the Mac",
+        .buildBuilding: "Building on the Mac",
+        .buildAsk: "Build this game on your Mac?",
+        .buildAskBody: "The Mac builds it from your own files, which can take up to an hour. The game downloads here by itself when it is ready.",
+        .buildAction: "Build it",
+        .buildsRefused: "This Mac does not let iPhones start builds. Turn on “Let paired iPhones start builds of my games” in the launcher's Sharing settings.",
+        .buildBusy: "The Mac is already building as much as it takes for iPhones. Try again later.",
+        .buildGone: "The Mac no longer has this game to build.",
+        .repairTitle: "Check and repair the game",
+        .repairBody: "Reads the whole game data and compares it with the list the game came with. Damaged parts are fetched again from a source, and only those.",
+        .repairScanning: "Checking the game data…",
+        .repairClean: "The game data is intact.",
+        .repairFound: "%d of %d parts are damaged.",
+        .repairFrom: "Repair from %@",
+        .repairNoSource: "No source has this game right now. Turn network sources on, or send the game again from the Mac.",
+        .repairDone: "%d parts repaired.",
+        .repairNoList: "This game was installed before this check existed. Updating it from a source adds what the check needs.",
+        .repairRepairing: "Repairing…",
+        .lastSession: "Last session",
+        .thermalNominal: "Cool",
+        .thermalFair: "Warm",
+        .thermalSerious: "Hot",
+        .thermalCritical: "Too hot",
+        .sessionHeat: "Heat",
+        .sessionBattery: "Battery used",
+        .autoBackupTitle: "Back up my saves by themselves",
+        .autoBackupBody: "After you played a game, its saves are sent to your Mac and servers that keep them, the next time you open the app. Needs a Mac that accepts copies, or an SFTP server.",
+        .syncTitle: "Offer newer saves from my other devices",
+        .syncBody: "When you start a game, the Mac and servers are asked for saves from another of your devices that are newer than these. You decide before the game starts.",
+        .syncFoundTitle: "Newer saves found",
+        .syncFoundBody: "%@ holds saves from %@, newer than the ones on this iPhone. Use them? The saves you have now are kept as a copy.",
+        .syncUse: "Use them",
+        .syncKeep: "Keep mine",
+        .timeMachineRemote: "On your Mac and servers",
+        .timeMachineRemoteLoading: "Looking for copies…",
+        .restoreRemoteBody: "The saves you have now are kept as a copy in Files, under Saves.",
+        .archiveLinkTitle: "Link to the archive",
+        .archiveLinkHint: "An https link. It is used once and not kept. The archive needs room on this iPhone for itself and for what it holds.",
+        .archiveUnpacking: "Unpacking",
+        .archiveChecking: "Checking the build",
+        .archiveDownloading: "Downloading the archive",
+        .archiveBadLink: "That is not an https link.",
+        .archiveWarningTitle: "Before you import",
+        .archiveWarning: "A build holds the game's own data and code that this app signs and runs. Only import a build you made yourself, from your own game files, and from a place you trust. A build from anywhere else may be an illegal copy of a game, or may hold harmful code.",
+        .archiveImportAction: "Import",
+        .addWebLibrary: "Add a web library",
+        .sourceKindWeb: "Web library",
+        .webLibraryBody: "The address of a folder the launcher exported for the web (Settings → My server → A web copy of my built games), put behind https on a server of yours. The address can be the secret; an access token is optional. Nothing runs on the server: it only has to serve files.",
+        .webTokenLabel: "Access token (optional)",
+        .webLibraryCheck: "Check the address",
+        .webLibraryFound: "%d game(s) found.",
+        .sourceSave: "Add this source",
+        .addGames: "Add games",
+        .receivingStopped: "Stopped",
+        .receivingStoppedBody: "Nothing has arrived for a while: the Mac stopped sending, or was cancelled. Delete what arrived.",
+        .buildsOnMac: "Builds on your Mac",
+        .buildFailedOnMac: "The build failed on the Mac",
+        .buildsOffTitle: "Games your Mac could build",
+        .buildsOffBody: "%@ does not let this iPhone ask for builds. To see the games it can build and start one from here, turn on \"Let paired iPhones start builds of my games\" in the Mac app's Settings → Sharing.",
+        .importArchiveItem: "Import an archive",
+        .importFolderItem: "Import a folder",
+        .importLinkItem: "Download from a link",
+        .importSection: "A build you already have",
+        .sourcesSection: "From your Mac or a server",
+        .archiveHashPlaceholder: "SHA-256 of the archive (optional)",
+        .archiveHashHint: "If you give the hash the launcher showed when it made the archive, it is checked before anything is unpacked.",
+        .archiveHashing: "Checking the archive's hash",
+        .cheats: "Cheats",
+        .cheatsBody: "Import a cheat file in the Atmosphère format (the .txt that cheat sites share for your game's version). Cheats that change values in memory work on the iPhone; a cheat that writes into the game's code does not, and the engine says so below.",
+        .cheatsImport: "Import a cheat file",
+        .cheatsReplace: "Replace the file",
+        .cheatsRemove: "Remove the file",
+        .cheatsOn: "Cheats on",
+        .cheatsSearch: "Search",
+        .cheatsMasterCode: "Master code: always on",
+        .cheatsNextStart: "What is on is applied the next time the game starts.",
+        .cheatsNoBuild: "This game was built before its version could be read, so a cheat file cannot be matched to it. Build it again on the Mac to use cheats.",
+        .cheatsRefused: "This file is not a cheat file the engine would read:",
+        .cheatsSafeMode: "The last start with cheats on did not come back, so cheats were turned off for this game. Turn them back on when you want.",
+        .cheatsEngineSaid: "THE ENGINE SAID, AT THE LAST START",
+        .archiveResumeHint: "What arrived is kept: give the same link again to go on from there.",
+        .downloadSelected: "Download",
+        .pauseAction: "Pause",
+        .resumeAction: "Resume",
+        .downloadingNow: "Downloading",
+        .pausedState: "Paused",
     ]
 }

@@ -226,7 +226,6 @@ final class ShellHostModelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: workspace) }
         let model = ShellHostModel(documents: workspace, engineHost: UnlinkedEngineHost(), signer: UnavailableSigner())
         guard model.signingIdentity == nil else { throw XCTSkip("a certificate is installed in this keychain") }
-        model.language = "en"
         model.testLoad(InstalledGame(titleID: TitleID("0100111000200000")!, directory: workspace))
         guard case .failed(let message) = model.loadTest else { return XCTFail("expected a refusal") }
         XCTAssertFalse(message.contains("engine"), "the load test must not need the engine: \(message)")

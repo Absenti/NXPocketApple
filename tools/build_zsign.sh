@@ -14,10 +14,10 @@
 #      checks the layout it actually finds.
 #
 #      LiveContainer keeps its own copy of zsign under ZSign/ and implements the same API. It is NOT used here: that
-#      repository is AGPL-3.0 and this project is MIT (PLAN.md forbids AGPL code outright). See NOTICE.
+#      repository is AGPL-3.0 and this project is MIT (AGPL code is excluded outright). See NOTICE.
 #
 # It is not vendored: it is fetched from its own repository at a pinned revision. The engine's host is not built here
-# or anywhere in this project: each game's framework carries its own (docs/ENGINE.md).
+# or anywhere in this project: each game's framework carries its own (docs/ARCHITECTURE.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT=$PWD
@@ -58,7 +58,7 @@ for patch in "$ROOT"/patches/zsign/*.patch; do
 done
 
 say "checking the licence"
-# PLAN.md's first rule: no AGPL code in this project. zsign is MIT; verify rather than assume, because a wrong
+# The first rule of this project: no AGPL code. zsign is MIT; verify rather than assume, because a wrong
 # repository silently changes the licence of everything linked into the app.
 if ! grep -qiE 'MIT License|Permission is hereby granted, free of charge' "$WORK/zsign/LICENSE" 2>/dev/null; then
     die "$ZSIGN_REPO at $REV is not MIT. Stop: its licence decides what this project may do. See NOTICE."

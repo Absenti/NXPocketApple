@@ -8,8 +8,8 @@ import UniformTypeIdentifiers
 enum GameMenuAction {
     case play, testLoad, settings
     case rename, resign
-    case exportSaves, importSaves, deleteSaves
-    case addToHomeScreen, logs, copyIdentifier, remove
+    case exportSaves, importSaves, deleteSaves, backUpSaves, timeMachine, cheats
+    case addToHomeScreen, logs, copyIdentifier, offload, repair, remove
 }
 
 /// The menu itself. Play and the test first; then what changes the game; then what identifies it and what it takes.
@@ -26,12 +26,15 @@ struct GameMenuItems: View {
             if showsSettings { item(.settings, .gameSettings, "slider.horizontal.3") }
         }
         Section {
+            item(.cheats, .cheats, "wand.and.stars").disabled(game.isBroken)
             item(.rename, .rename, "pencil")
             item(.resign, .resignGame, "signature")
                 .disabled(model.signingIdentity == nil || game.isBroken || model.importState.isRunning)
             Menu {
                 item(.exportSaves, .exportSaves, "square.and.arrow.up").disabled(!hasSaves)
                 item(.importSaves, .importSaves, "square.and.arrow.down")
+                item(.timeMachine, .timeMachine, "clock.arrow.circlepath").disabled(model.saveSnapshots(of: game).isEmpty && model.backupDestinations.isEmpty)
+                if !model.backupDestinations.isEmpty { item(.backUpSaves, .backUpSaves, "icloud.and.arrow.up").disabled(!hasSaves) }
                 Button(role: .destructive) { perform(.deleteSaves) } label: {
                     Label(model.text(.deleteSaves), systemImage: "trash")
                 }
@@ -39,6 +42,7 @@ struct GameMenuItems: View {
             } label: {
                 Label(model.text(.saves), systemImage: "externaldrive")
             }
+            item(.repair, .repairTitle, "checkmark.shield").disabled(game.package?.romfsBlocks == nil || model.repairBusy)
             item(.addToHomeScreen, .addToHomeScreen, "apps.iphone.badge.plus")
             item(.logs, .logs, "doc.text")
         }
@@ -46,6 +50,7 @@ struct GameMenuItems: View {
             item(.copyIdentifier, .copyIdentifier, "doc.on.doc")
         }
         Section(model.sizesText(game)) {
+            item(.offload, .offload, "icloud.and.arrow.up").disabled(model.importState.isRunning)
             Button(role: .destructive) { perform(.remove) } label: { Label(model.text(.remove), systemImage: "trash") }
         }
     }
@@ -62,12 +67,18 @@ enum GameSheet: Identifiable {
     case share(URL)
     case logs(titleID: String?, open: LogFile?)
     case shortcut(name: String, file: URL)
+    case timeMachine(InstalledGame)
+    case repair(InstalledGame)
+    case cheats(InstalledGame)
 
     var id: String {
         switch self {
         case .share(let url): return "share:\(url.path)"
         case .logs(let titleID, let open): return "logs:\(titleID ?? ""):\(open?.id ?? "")"
         case .shortcut(_, let file): return "shortcut:\(file.path)"
+        case .timeMachine(let game): return "timemachine:\(game.id)"
+        case .repair(let game): return "repair:\(game.id)"
+        case .cheats(let game): return "cheats:\(game.id)"
         }
     }
 }
@@ -85,10 +96,13 @@ final class GameActionCenter: ObservableObject {
     @Published var renaming: InstalledGame?
     @Published var newName = ""
     @Published var removing: InstalledGame?
+    @Published var offloading: InstalledGame?
     @Published var deletingSaves: InstalledGame?
     @Published var showingImporter = false
     @Published var sheet: GameSheet?
     @Published var notice: GameNotice?
+    /// The game whose saves are being sent, until the player has said where.
+    @Published var backingUp: InstalledGame?
     /// The game the file picker imports into: kept apart from `showingImporter`, which the picker clears on its own.
     var importTarget: InstalledGame?
 
@@ -107,6 +121,10 @@ final class GameActionCenter: ObservableObject {
             importTarget = game
             showingImporter = true
         case .deleteSaves: deletingSaves = game
+        case .timeMachine: sheet = .timeMachine(game)
+        case .backUpSaves:
+            let destinations = model.backupDestinations
+            if destinations.count == 1 { backUp(game, to: destinations[0], model: model) } else { backingUp = game }
         case .addToHomeScreen:
             switch model.makeShortcut(game) {
             case .success(let file): sheet = .shortcut(name: model.name(of: game), file: file)
@@ -114,7 +132,21 @@ final class GameActionCenter: ObservableObject {
             }
         case .logs: sheet = .logs(titleID: game.id, open: nil)
         case .copyIdentifier: UIPasteboard.general.string = game.id
+        case .offload: offloading = game
+        case .cheats: sheet = .cheats(game)
+        case .repair:
+            model.dismissRepair()
+            sheet = .repair(game)
+            model.verify(game)
         case .remove: removing = game
+        }
+    }
+
+    func backUp(_ game: InstalledGame, to record: SourceRecord, model: ShellHostModel) {
+        notice = GameNotice(title: model.text(.backUpSaves), message: model.text(.backupRunning))
+        Task {
+            let message = await model.backUpSaves(of: game, to: record)
+            notice = GameNotice(title: model.text(.backUpSaves), message: message)
         }
     }
 
@@ -187,6 +219,20 @@ private struct GameActionsModifier: ViewModifier {
                 }
             }
             .background {
+                Color.clear.confirmationDialog(model.text(.offload), isPresented: isSet(\.offloading), titleVisibility: .visible,
+                                               presenting: center.offloading) { game in
+                    Button(model.text(.offload)) {
+                        model.offload(game)
+                        removed(game)
+                    }
+                    Button(model.text(.cancel), role: .cancel) {}
+                } message: { game in
+                    let known = model.sources.enabled && model.sources.offered.contains { $0.game.titleID == game.id }
+                    Text(String(format: model.text(.offloadBody), model.sizeText(game.byteCount))
+                         + (known ? "" : "\n" + model.text(.offloadNoSource)))
+                }
+            }
+            .background {
                 Color.clear.confirmationDialog(model.text(.deleteSaves), isPresented: isSet(\.deletingSaves),
                                                titleVisibility: .visible, presenting: center.deletingSaves) { game in
                     Button(model.text(.deleteSaves), role: .destructive) {
@@ -197,6 +243,17 @@ private struct GameActionsModifier: ViewModifier {
                     Button(model.text(.cancel), role: .cancel) {}
                 } message: { game in
                     Text("\(model.name(of: game)) · \(model.sizeText(model.saveBytes(game)))\n\(model.text(.deleteSavesBody))")
+                }
+            }
+            .background {
+                Color.clear.confirmationDialog(model.text(.backUpSaves), isPresented: isSet(\.backingUp), titleVisibility: .visible,
+                                               presenting: center.backingUp) { game in
+                    ForEach(model.backupDestinations) { record in
+                        Button(record.name) { center.backUp(game, to: record, model: model) }
+                    }
+                    Button(model.text(.cancel), role: .cancel) {}
+                } message: { _ in
+                    Text(model.text(.backupWhere))
                 }
             }
             .background {
@@ -215,6 +272,18 @@ private struct GameActionsModifier: ViewModifier {
                     ActivityView(items: [url]).presentationDetents([.medium, .large])
                 case .logs(let titleID, let open):
                     LogsView(titleID: titleID, open: open)
+                        .environmentObject(model)
+                        .presentationBackground(ShellInk.background)
+                case .cheats(let game):
+                    CheatsSheet(game: game)
+                        .environmentObject(model)
+                        .presentationBackground(ShellInk.background)
+                case .repair(let game):
+                    RepairSheet(game: game)
+                        .environmentObject(model)
+                        .presentationBackground(ShellInk.background)
+                case .timeMachine(let game):
+                    TimeMachineSheet(game: game)
                         .environmentObject(model)
                         .presentationBackground(ShellInk.background)
                 case .shortcut(let name, let file):

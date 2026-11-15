@@ -2,12 +2,14 @@ import Foundation
 import NXPocketKit
 
 /// A game the Mac is still sending into `Documents/.incoming/<uuid>/`: which game, once its `package.json` has landed (the
-/// Mac sends the package's entries by name with `romfs.img` last, so it comes early), and how many bytes are there.
+/// Mac sends `package.json` first and `romfs.img` last, so the name is known from the start), and how many bytes are there.
 public struct IncomingTransfer: Equatable, Sendable, Identifiable {
     public var folder: URL
     public var title: String?
     public var received: Int64
     public var expected: Int64?
+    /// Nothing has arrived for a while: the Mac stopped sending (cancelled, asleep, unplugged). The player may delete what arrived.
+    public var stalled = false
 
     public var id: String { folder.lastPathComponent }
 
@@ -19,7 +21,7 @@ public struct IncomingTransfer: Equatable, Sendable, Identifiable {
 }
 
 public enum IncomingTransfers {
-    /// The transfers still on their way: no `.complete` yet and not given up by the Mac (`.abandoned`). Measured from the
+    /// The Mac's pushes still on their way: no `.complete` yet and not given up by the Mac (`.abandoned`). Measured from the
     /// files themselves: devicectl writes a copied file in place, so a growing `romfs.img` is the progress.
     public static func receiving(documents: URL, fileManager: FileManager = .default) -> [IncomingTransfer] {
         let root = GameLayout.incomingDirectory(in: documents)
@@ -29,7 +31,9 @@ public enum IncomingTransfers {
             var isDirectory: ObjCBool = false
             guard fileManager.fileExists(atPath: folder.path, isDirectory: &isDirectory), isDirectory.boolValue,
                   !fileManager.fileExists(atPath: folder.appendingPathComponent(GameLayout.completeMarker).path),
-                  !fileManager.fileExists(atPath: folder.appendingPathComponent(GameLayout.abandonedMarker).path) else { return nil }
+                  !fileManager.fileExists(atPath: folder.appendingPathComponent(GameLayout.abandonedMarker).path),
+                  // A download this phone started itself has its own place on the Sources screen, with pause and cancel.
+                  !fileManager.fileExists(atPath: folder.appendingPathComponent(GameLayout.downloadJournal).path) else { return nil }
             let package = BoundedRead.dataIfPresent(at: folder.appendingPathComponent(GamePackage.fileName), fileManager: fileManager)
                 .flatMap { try? GamePackage.decode($0) }
             return IncomingTransfer(folder: folder, title: package?.name, received: bytes(in: folder, fileManager: fileManager),

@@ -19,6 +19,11 @@ struct LibraryNotices: View {
             launchCard
             failedLaunch
             UpdateNotice(updates: model.updates)
+            ForEach(model.sources.buildsOff) { record in
+                NoticeCard(symbol: "hammer.fill", tint: ShellInk.accent, title: model.text(.buildsOffTitle), detail: String(format: model.text(.buildsOffBody), record.name)) {
+                    Button(model.text(.close)) { model.sources.hushBuildsOff(record) }.buttonStyle(ShellButtonStyle())
+                }
+            }
             ForEach(model.receiving) { ReceivingTransferCard(transfer: $0) }
             ImportStateCard(openLog: openLog)
             if model.certificate == nil, !compact {
@@ -28,7 +33,7 @@ struct LibraryNotices: View {
                 }
             } else if !model.importState.isRunning, toSign > 0, !compact {
                 NoticeCard(symbol: "signature", tint: ShellInk.accent,
-                           title: "\(ShellStrings.gameCount(toSign, language: model.language)) \(model.text(.toSignAgain))",
+                           title: "\(ShellStrings.gameCount(toSign)) \(model.text(.toSignAgain))",
                            detail: model.text(.signAgainBody)) {
                     Button(model.text(.sign)) { model.resignAll() }.buttonStyle(ShellButtonStyle(prominent: true))
                 }
@@ -82,9 +87,15 @@ struct ReceivingTransferCard: View {
         let detail = transfer.expected.map {
             "\(received) \(model.text(.sizeOf)) \(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file))"
         } ?? "\(received) \(model.text(.received))"
-        NoticeCard(symbol: "arrow.down.circle.fill", tint: ShellInk.accent,
-                   title: "\(model.text(.receiving)) · \(transfer.title ?? model.text(.aGame))", detail: detail,
-                   progress: transfer.fraction ?? 0) { EmptyView() }
+        NoticeCard(symbol: transfer.stalled ? "pause.circle.fill" : "arrow.down.circle.fill", tint: transfer.stalled ? ShellInk.secondary : ShellInk.accent,
+                   title: "\(model.text(transfer.stalled ? .receivingStopped : .receiving)) · \(transfer.title ?? model.text(.aGame))",
+                   detail: transfer.stalled ? "\(detail)\n\(model.text(.receivingStoppedBody))" : detail,
+                   progress: transfer.fraction ?? 0) {
+            // Offered only once nothing has come for a while: deleting what the Mac is still sending would only be sent again.
+            if transfer.stalled {
+                Button(model.text(.deleteTransfer)) { model.discardTransfer(transfer.id) }.buttonStyle(ShellButtonStyle(prominent: true))
+            }
+        }
     }
 }
 

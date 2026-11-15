@@ -42,6 +42,9 @@ struct SettingsView: View {
                 }
             }
 
+            EngineGroup()
+
+            SharingGroup()
             group("Application") {
                 SettingRow(symbol: "arrow.down.circle",
                            title: "NXPocketApple \(model.runningVersion?.description ?? "(development build)")",
@@ -50,7 +53,7 @@ struct SettingsView: View {
                 }
                 Button { advanced = true } label: {
                     SettingRow(symbol: "slider.horizontal.3", title: "Advanced",
-                               detail: "Engine, Xcode, Python, work folder") {
+                               detail: "Xcode, Python, work folder") {
                         Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Ink.secondary)
                     }
                     .contentShape(Rectangle())
@@ -58,7 +61,7 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
 
-            Note("NXPocketApple never asks for your Apple ID password, never copies prod.keys, and sends nothing to a server: the engine runs on this Mac.")
+            Note("NXPocketApple never asks for your Apple ID password and never copies prod.keys. Nothing is sent to a server: the engine runs on this Mac, and sharing is off until you turn it on.")
         }
         .sheet(isPresented: $advanced) { AdvancedSettingsView() }
     }
@@ -101,10 +104,6 @@ struct AdvancedSettingsView: View {
                 PageTitle(title: "Advanced", size: 32,
                           subtitle: "You normally never need these: NXPocketApple finds them by itself.")
                 VStack(spacing: 0) {
-                    SettingRow(symbol: "gearshape.2", title: "Engine",
-                               detail: Friendly.path(model.settings.value.engineRoot.isEmpty ? model.toolchain.engine.root.path : model.settings.value.engineRoot)) {
-                        Button("Change") { model.chooseEngineFolder() }.buttonStyle(QuietButtonStyle(large: true))
-                    }
                     SettingRow(symbol: "hammer", title: "Xcode", detail: model.toolchain.xcode.map { Friendly.path($0.path) } ?? "not found") {
                         Button("Change") { model.chooseXcode() }.buttonStyle(QuietButtonStyle(large: true))
                     }

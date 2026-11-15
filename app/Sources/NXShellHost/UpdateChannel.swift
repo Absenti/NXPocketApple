@@ -1,8 +1,10 @@
 import Foundation
 
-/// The app's only network call: one GET of the SideStore source the project publishes with each release, to say
-/// whether a newer NXPocketApple exists. Nothing about the player or the phone is sent: no cookie, no cache, no query, no
-/// identifier beyond what any HTTP client sends. Installing an update is SideStore's job, never this app's.
+/// The app's one call to a server it does not belong to: one GET of the SideStore source the project publishes with each
+/// release, to say whether a newer NXPocketApple exists. Nothing about the player or the phone is sent: no cookie, no
+/// cache, no query, no identifier beyond what any HTTP client sends. Installing an update is SideStore's job, never this
+/// app's. (The network sources of `NetworkSources` talk to the player's own Mac or SFTP server, and only once the player
+/// turned them on; they are a separate switch from this check's.)
 public enum UpdateChannel {
     /// The source CI publishes with each release (AltStore/SideStore source format). It stays at this address.
     public static let sourceURL = URL(string: "https://github.com/Absenti/NXPocketApple/releases/latest/download/source.json")!

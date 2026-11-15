@@ -92,9 +92,8 @@ public final class ProcessRunner: @unchecked Sendable {
         // A stopped process only acts on SIGTERM once it runs again, and what it started must not stay stopped with
         // nobody left to wake it.
         resume()
-        // Everything below the process goes with it. Only the process itself used to be told, and what it had started (the
-        // Metal compiler of every shader, Xcode and its build service) carried on after a cancel, burning the Mac and
-        // writing files into the folder the build was about to be cleaned out of.
+        // Everything below the process goes with it (the Metal compiler, Xcode and its build service), or it would carry on
+        // burning the Mac and writing into the folder the cancel is about to clean.
         let tree = process.isRunning ? ProcessTree.members(of: process.processIdentifier) : []
         lock.lock()
         doomed = tree
@@ -228,8 +227,7 @@ public final class ProcessRunner: @unchecked Sendable {
     }
 }
 
-/// The last `capacity` lines, in order, without moving the others each time one is dropped: the result used to keep
-/// its lines in an array whose first element was removed at every line past the limit.
+/// The last `capacity` lines, in order, without moving the others each time one is dropped.
 struct LineRing {
     let capacity: Int
     private var storage: [String] = []

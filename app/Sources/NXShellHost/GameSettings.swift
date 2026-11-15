@@ -120,12 +120,20 @@ public struct GameChoices: Equatable, Sendable {
     /// The time spent in the game and when it was last played (`PlayClock`).
     public var playSeconds: Int = 0
     public var lastPlayed: Date?
+    /// How many times the game was started, and the frames it drew in the seconds it drew any (`FrameCounter`).
+    public var sessions: Int = 0
+    public var fpsFrames: Int64 = 0
+    public var fpsSeconds: Int = 0
 
-    public init(values: [String: String] = [:], name: String? = nil, playSeconds: Int = 0, lastPlayed: Date? = nil) {
+    public init(values: [String: String] = [:], name: String? = nil, playSeconds: Int = 0, lastPlayed: Date? = nil,
+                sessions: Int = 0, fpsFrames: Int64 = 0, fpsSeconds: Int = 0) {
         self.values = values
         self.name = name
         self.playSeconds = playSeconds
         self.lastPlayed = lastPlayed
+        self.sessions = sessions
+        self.fpsFrames = fpsFrames
+        self.fpsSeconds = fpsSeconds
     }
 
     public static func url(titleID: String, documents: URL) -> URL {
@@ -140,7 +148,10 @@ public struct GameChoices: Equatable, Sendable {
         let name = (object["name"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         let seconds = max(0, (object["play_seconds"] as? NSNumber)?.intValue ?? 0)
         let last = (object["last_played"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) }
-        return GameChoices(values: values.compactMapValues { $0 as? String }, name: name, playSeconds: seconds, lastPlayed: last)
+        return GameChoices(values: values.compactMapValues { $0 as? String }, name: name, playSeconds: seconds, lastPlayed: last,
+                           sessions: max(0, (object["sessions"] as? NSNumber)?.intValue ?? 0),
+                           fpsFrames: max(0, (object["fps_frames"] as? NSNumber)?.int64Value ?? 0),
+                           fpsSeconds: max(0, (object["fps_seconds"] as? NSNumber)?.intValue ?? 0))
     }
 
     public func save(titleID: String, documents: URL, fileManager: FileManager = .default) throws {
@@ -148,6 +159,8 @@ public struct GameChoices: Equatable, Sendable {
         if let name { object["name"] = name }
         if playSeconds > 0 { object["play_seconds"] = playSeconds }
         if let lastPlayed { object["last_played"] = ISO8601DateFormatter().string(from: lastPlayed) }
+        if sessions > 0 { object["sessions"] = sessions }
+        if fpsSeconds > 0 { object["fps_frames"] = fpsFrames; object["fps_seconds"] = fpsSeconds }
         try SettingsFolder.write(object, to: Self.url(titleID: titleID, documents: documents), fileManager: fileManager)
     }
 

@@ -4,8 +4,7 @@ import NXPocketKit
 
 /// The queue: games built one after another (the engine runs one build at a time: its tools, its work folders and
 /// the Mac's cores are all taken by one), each sent to the iPhone right after its build when asked, and packages
-/// sent on their own. One transfer at a time too: a second Send while the first was still copying used to put a
-/// second 5 GB copy on the phone.
+/// sent on their own. One transfer at a time too: two copies at once would put two multi-GB copies on the phone.
 extension AppModel {
     public var queueIsRunning: Bool { queueTask != nil }
     public var queueHasWork: Bool { queue.contains { !$0.phase.isFinished } }
@@ -38,23 +37,104 @@ extension AppModel {
             return
         }
         let device = settings.value.sendAfterBuild ? selectedDevice : nil
-        for game in folder.games where checkedGames.contains(game.titleID) {
-            if queue.contains(where: { $0.titleID == game.titleID && !$0.phase.isFinished }) { continue }
-            var item = QueueItem(titleID: game.titleID, name: displayName(titleID: game.titleID, own: game.name),
-                                 job: .build(placeholderPlan(game), sendTo: nil),
-                                 deviceName: device?.name)
-            do {
-                let plan = try game.plan(selection(for: game), workRoot: settings.value.workURL)
-                if let blocker = pythonBlocker(compressed: plan.compressed) { throw NXPocketError(.engineMissing, blocker) }
-                item.job = .build(plan, sendTo: device?.udid)
-            } catch let error as NXPocketError {
-                item.phase = .failed(error.detail)
-            } catch {
-                item.phase = .failed("\(error)")
-            }
-            queue.append(item)
-        }
+        for game in folder.games where checkedGames.contains(game.titleID) { enqueueBuild(game, device: device) }
         checkedGames = []
+        startQueue()
+    }
+
+    /// The games of the games folder that can be built and are not in the library yet. A package that exists but is damaged is in the
+    /// library (it shows as needing a rebuild), so it is not listed here too.
+    public var buildableGames: [FolderGame] {
+        let built = Set(games.map(\.titleID))
+        return folder.games.filter { $0.hasBase && !built.contains($0.titleID) }
+    }
+
+    /// The build of this game that is waiting or running, if any.
+    public func buildItem(_ titleID: String) -> QueueItem? {
+        queue.first { item in
+            guard item.titleID == titleID, !item.phase.isFinished else { return false }
+            if case .build = item.job { return true }
+            return false
+        }
+    }
+
+    /// Builds one game of the library's "to build" list with the updates and DLC the folder's defaults pick (the Build screen is where
+    /// they are chosen one by one). Sent to the iPhone afterwards when Settings says so.
+    public func buildFromLibrary(_ game: FolderGame) {
+        if let blocker = toolchainBlocker {
+            append("build: \(blocker)")
+            libraryProblem = blocker
+            return
+        }
+        enqueueBuild(game, device: settings.value.sendAfterBuild ? selectedDevice : nil)
+        startQueue()
+    }
+
+    /// Queues one game's build, sent to `device` afterwards when given. A game already waiting or building is left alone.
+    func enqueueBuild(_ game: FolderGame, device: Device?) {
+        if queue.contains(where: { $0.titleID == game.titleID && !$0.phase.isFinished }) { return }
+        var item = QueueItem(titleID: game.titleID, name: displayName(titleID: game.titleID, own: game.name),
+                             job: .build(placeholderPlan(game), sendTo: nil),
+                             deviceName: device?.name)
+        do {
+            let plan = try game.plan(selection(for: game), workRoot: settings.value.workURL)
+            if let blocker = pythonBlocker(compressed: plan.compressed) { throw NXPocketError(.engineMissing, blocker) }
+            item.job = .build(plan, sendTo: device?.udid)
+        } catch let error as NXPocketError {
+            item.phase = .failed(error.detail)
+        } catch {
+            item.phase = .failed("\(error)")
+        }
+        queue.append(item)
+    }
+
+    /// An iPhone asked, over the sharing server, for a game of the dump folder to be built. Nothing is sent to the phone from here:
+    /// it downloads the game once it is among the Mac's built ones.
+    func queueBuild(titleID: String) {
+        guard let game = folder.games.first(where: { $0.titleID == titleID && $0.hasBase }) else { return }
+        if let blocker = toolchainBlocker {
+            var item = QueueItem(titleID: game.titleID, name: displayName(titleID: game.titleID, own: game.name),
+                                 job: .build(placeholderPlan(game), sendTo: nil))
+            item.phase = .failed(blocker)
+            queue.append(item)
+            append("an iPhone asked for \(game.name): \(blocker)")
+            return
+        }
+        append("an iPhone asked for \(game.name) to be built")
+        enqueueBuild(game, device: nil)
+        startQueue()
+    }
+
+    /// The engine refuses to build when the game's cached provisional profile describes another version than the one in the
+    /// folder ("…describes v0, but inputs select v65536. Preserving the existing profile at <folder>…"): it never overwrites
+    /// a profile. Returns that folder when a failure is this one.
+    nonisolated public static func staleProfileFolder(in reason: String) -> URL? {
+        guard reason.contains("cached provisional profile"), let start = reason.range(of: "Preserving the existing profile at ") else { return nil }
+        let rest = reason[start.upperBound...]
+        guard let end = rest.range(of: ". Use --profile-out") else { return nil }
+        let path = String(rest[..<end.lowerBound])
+        return path.hasPrefix("/") ? URL(fileURLWithPath: path, isDirectory: true) : nil
+    }
+
+    /// Puts the stale profile aside (renamed, never deleted: it is the engine's survey of the older version) and queues the
+    /// build again, so the engine surveys the version now in the folder into a fresh profile.
+    public func surveyUpdate(_ id: UUID) {
+        guard let item = queue.first(where: { $0.id == id }), case .failed(let reason) = item.phase,
+              let folder = Self.staleProfileFolder(in: reason) else { return }
+        let fileManager = FileManager.default
+        var aside = folder.deletingLastPathComponent().appendingPathComponent("\(folder.lastPathComponent)-older")
+        var number = 2
+        while fileManager.fileExists(atPath: aside.path) {
+            aside = folder.deletingLastPathComponent().appendingPathComponent("\(folder.lastPathComponent)-older-\(number)")
+            number += 1
+        }
+        do { try fileManager.moveItem(at: folder, to: aside) }
+        catch {
+            append("build: the old profile could not be put aside: \(error.localizedDescription)")
+            return
+        }
+        append("build: \(item.name): the old profile is kept as \(aside.lastPathComponent); the engine surveys the new version")
+        update(id) { $0.phase = .waiting }
         startQueue()
     }
 
@@ -116,6 +196,10 @@ extension AppModel {
         }
         guard !queue[index].phase.isFinished else { return }
         cancelledItems.insert(id)
+        // A send answers the click at once. What it is doing (reading the iPhone, copying the saves back, or devicectl itself) stops as
+        // soon as it can, and the part already sent is marked for deletion on the phone in the background: the player is not made to
+        // watch a "Sending" that no longer means anything.
+        if case .sending = queue[index].phase { queue[index].phase = .cancelled }
         if pendingAnswers[id] != nil { answer(id, sendAnyway: false) }
         if let runner {
             append("build: cancelling")
@@ -167,8 +251,7 @@ extension AppModel {
             }
         } catch let error as NXPocketError where error.code == .cancelled {
             update(item.id) { $0.phase = .cancelled }
-            // Always said, a send included: it used to be said only for a build, and a send cancelled by the user (the part
-            // already sent is marked for deletion on the phone) left nothing in the log to explain that folder.
+            // Always logged, a send included: the part already sent is marked for deletion on the phone, and the log explains it.
             append("\(item.name): \(error.detail)")
         } catch let error as NXPocketError {
             append("\(item.name): \(error)")
@@ -301,8 +384,51 @@ extension AppModel {
         refreshLibrary()
         append("packed \(packaged.package.titleID) \(packaged.manifest.name) \(packaged.package.packageVersion) — "
                + ByteCountFormatter.string(fromByteCount: packaged.package.totalSize, countStyle: .file))
-        await removeDecompressedCopy(of: plan, id: id)
+        if settings.value.removeBuildFolder {
+            await removeBuildFolder(of: plan, id: id)
+        } else {
+            await removeDecompressedCopy(of: plan, id: id)
+        }
         return packaged.root
+    }
+
+    /// Once the package is written, the game's whole work folder goes: the package is complete without it (the image was copied into it,
+    /// the framework hashed and copied), and it is gigabytes of extraction. Only after a build that succeeded: a failed one keeps its
+    /// folder and its logs.
+    private func removeBuildFolder(of plan: BuildPlan, id: UUID) async {
+        let folder = plan.workFolder
+        let removed = await Task.detached(priority: .utility) { BuildFolders.remove(folder) }.value
+        guard let removed else {
+            append("build: \(plan.name): its work folder was not removed (\(folder.lastPathComponent) is not one that is)")
+            return
+        }
+        let size = ByteCountFormatter.string(fromByteCount: removed, countStyle: .file)
+        append("build: \(plan.name): removed its work folder \(folder.lastPathComponent) (\(size)); the package and your dump are untouched")
+        update(id) { $0.note = "freed \(size) (work folder)" }
+    }
+
+    /// The work folders earlier builds left, for games whose package is built and that no build in the queue is using.
+    public func leftoverBuildFolders() async -> [(folder: URL, bytes: Int64)] {
+        var roots: [URL] = []
+        if let games = settings.value.gameURL { roots.append(games) }
+        if let work = settings.value.workURL { roots.append(work) }
+        let busy = Set(queue.filter { !$0.phase.isFinished }.map(\.titleID))
+        let built = Set(games.filter(\.isReady).map(\.titleID))
+        return await Task.detached(priority: .utility) {
+            BuildFolders.find(in: roots).compactMap { folder in
+                guard let titleID = BuildFolders.titleID(of: folder), built.contains(titleID), !busy.contains(titleID) else { return nil }
+                return (folder, BuildFolders.size(of: folder))
+            }
+        }.value
+    }
+
+    /// Removes those folders. Returns the bytes freed.
+    @discardableResult
+    public func deleteLeftoverBuildFolders() async -> Int64 {
+        let found = await leftoverBuildFolders()
+        let freed = await Task.detached(priority: .utility) { found.reduce(Int64(0)) { $0 + (BuildFolders.remove($1.folder) ?? 0) } }.value
+        append("build: removed \(found.count) work folder(s) left by earlier builds, \(ByteCountFormatter.string(fromByteCount: freed, countStyle: .file))")
+        return freed
     }
 
     /// Once the package is built, the `.nsp` / `.xci` the engine made out of an `.nsz` / `.xcz` can go: it is as large as
@@ -345,6 +471,10 @@ extension AppModel {
     /// One transfer, to the device named by its UDID, looked for again first.
     private func send(_ id: UUID, package: URL, to udid: String) async throws {
         if isCancelled(id) { throw NXPocketError(.cancelled, "send cancelled") }
+        // Made before anything slow, so a cancel always has something to stop, whatever step the send is in.
+        let control = DeviceTransfer.Control()
+        transferControl = control
+        defer { transferControl = nil }
         update(id) { $0.phase = .sending(fraction: 0, detail: "looking for the iPhone") }
         let found = await searchDevices(quiet: true)
         if isCancelled(id) { throw NXPocketError(.cancelled, "send cancelled") }
@@ -361,9 +491,6 @@ extension AppModel {
         }
         if isCancelled(id) { throw NXPocketError(.cancelled, "send cancelled") }
         let bundleID = settings.value.bundleID.isEmpty ? LauncherSettings.defaultBundleID : settings.value.bundleID
-        let control = DeviceTransfer.Control()
-        transferControl = control
-        defer { transferControl = nil }
         update(id) {
             $0.deviceName = device.name
             $0.phase = .sending(fraction: 0, detail: "starting")
@@ -415,7 +542,7 @@ extension AppModel {
     }
 
     /// The plan an item shows while its real one could not be made (it is marked failed at once).
-    private func placeholderPlan(_ game: FolderGame) -> BuildPlan {
+    func placeholderPlan(_ game: FolderGame) -> BuildPlan {
         BuildPlan(titleID: game.titleID, name: game.name, inputs: [], version: nil, packageVersion: nil,
                   dlcTitleIDs: [], workFolder: URL(fileURLWithPath: NSTemporaryDirectory()), compressed: false)
     }

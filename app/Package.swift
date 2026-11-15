@@ -23,7 +23,8 @@ var targets: [Target] = [
             path: "Sources/NXShellUI")
 ]
 
-var hostDependencies: [Target.Dependency] = ["NXShellUI", .product(name: "NXPocketKit", package: "core")]
+var hostDependencies: [Target.Dependency] = ["NXShellUI", .product(name: "NXPocketKit", package: "core"),
+                                              .product(name: "NXPocketSFTP", package: "core")]
 if hasSigningEngine {
     targets.append(.binaryTarget(name: "NXZSign", path: engineRelativePath))
     hostDependencies.append("NXZSign")
